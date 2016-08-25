@@ -2,6 +2,7 @@ package goutils
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -82,4 +83,9 @@ func Jsonify(v interface{}) string {
 // GetFuncName provides shortcut to print the name of any function.
 func GetFuncName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+}
+
+// NewError returns an error composed like fmt.Sprintf().
+func NewError(v ...interface{}) error {
+	return errors.New(fmt.Sprintln(v...))
 }
