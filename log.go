@@ -38,7 +38,7 @@ func Check(err error) {
 func DCheck(err error) {
 	if err != nil {
 		LogError(err)
-		if *debug {
+		if IsDebuging() {
 			panic(err)
 		}
 	}
@@ -56,7 +56,7 @@ func LogInfo(v ...interface{}) {
 
 // LogDebug prints info to standard output with [DEBUG] prefix in debug mode.
 func LogDebug(v ...interface{}) {
-	if *debug {
+	if IsDebuging() {
 		debugLog.Output(2, fmt.Sprintln(v...))
 	}
 }
@@ -88,4 +88,9 @@ func GetFuncName(i interface{}) string {
 // NewError returns an error composed like fmt.Sprintf().
 func NewError(v ...interface{}) error {
 	return errors.New(fmt.Sprintln(v...))
+}
+
+// IsDebuging returns whether it's in debug mode.
+func IsDebuging() bool {
+	return *debug
 }
