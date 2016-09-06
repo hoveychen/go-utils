@@ -87,6 +87,7 @@ func (w *CsvWriter) WriteStruct(i interface{}) error {
 
 func (w *CsvWriter) Close() error {
 	if w.file != nil {
+		w.Flush()
 		return w.file.Close()
 	}
 	return nil
