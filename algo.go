@@ -25,6 +25,20 @@ type StringIntPair struct {
 	Value int
 }
 
+type OrderByValue []StringIntPair
+
+func (slice OrderByValue) Less(i, j int) bool {
+	return slice[i].Value < slice[j].Value
+}
+
+func (slice OrderByValue) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func (slice OrderByValue) Len() int {
+	return len(slice)
+}
+
 func IterStringIntMap(in map[string]int) []StringIntPair {
 	keys := make([]string, len(in))
 	i := 0

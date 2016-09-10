@@ -29,3 +29,24 @@ func TestDedupStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestIterStringIntMap(t *testing.T) {
+	iter := IterStringIntMap(map[string]int{
+		"a": 5,
+		"c": 2,
+		"b": 1,
+	})
+
+	expected := []StringIntPair{
+		{"a", 5}, {"b", 1}, {"c", 2},
+	}
+	if len(iter) != len(expected) {
+		t.Error("Expected len", len(expected), "Actual len", len(iter))
+		return
+	}
+	for i, item := range iter {
+		if expected[i] != item {
+			t.Error("Expected", expected[i], "Actual", item)
+		}
+	}
+}
