@@ -56,3 +56,11 @@ func IterStringIntMap(in map[string]int) []StringIntPair {
 	}
 	return ret
 }
+
+func GenMask(slice []string) map[string]bool {
+	ret := map[string]bool{}
+	for _, i := range slice {
+		ret[i] = true
+	}
+	return ret
+}
