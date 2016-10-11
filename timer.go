@@ -1,6 +1,7 @@
 package goutils
 
 import (
+	"sync"
 	"time"
 )
 
@@ -53,10 +54,13 @@ type Monitor struct {
 	since time.Time
 	c     <-chan struct{}
 	first bool
+	sync.RWMutex
 }
 
 // Update the modified time of last read record.
 func (m *Monitor) Update(t time.Time) {
+	m.Lock()
+	defer m.Unlock()
 	if t.After(m.since) {
 		m.since = t
 	}
@@ -65,10 +69,13 @@ func (m *Monitor) Update(t time.Time) {
 // Next returns the latest record time to catch up. Any records with update time
 // later than the return value is regarded new unprocessed records.
 func (m *Monitor) Next() time.Time {
+	m.RLock()
 	if m.first {
+		m.RUnlock()
 		m.first = false
 		return m.since
 	}
+	m.RUnlock()
 	<-m.c
 	return m.since
 }
