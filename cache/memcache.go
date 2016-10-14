@@ -2,9 +2,10 @@
 package cache
 
 import (
-	"github.com/hoveychen/go-utils"
 	"sync"
 	"time"
+
+	"github.com/hoveychen/go-utils"
 )
 
 type MemCache struct {
@@ -16,14 +17,15 @@ type MemCache struct {
 type cachedItem struct {
 	Payload    interface{}
 	ExpireTime time.Time
+	TTL        time.Duration
 }
 
-func NewMemCache() *MemCache {
+func NewMemCache(checkInterval time.Duration) *MemCache {
 	c := &MemCache{
 		Items: map[string]*cachedItem{},
 	}
 	go func() {
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(checkInterval)
 		for range ticker.C {
 			c.checkExpire()
 		}
@@ -48,6 +50,8 @@ func (c *MemCache) Get(key string) interface{} {
 	defer c.lock.RUnlock()
 	i, hit := c.Items[key]
 	if hit {
+		// It's hit. Extends the expiring time by another TTL.
+		i.ExpireTime = goutils.GetNow().Add(i.TTL)
 		return i.Payload
 	} else {
 		return nil
@@ -60,11 +64,13 @@ func (c *MemCache) UpsertWithTTL(key string, val interface{}, ttl time.Duration)
 	i, hit := c.Items[key]
 	if hit {
 		i.Payload = val
+		i.TTL = ttl
 		i.ExpireTime = goutils.GetNow().Add(ttl)
 	} else {
 		c.Items[key] = &cachedItem{
 			Payload:    val,
 			ExpireTime: goutils.GetNow().Add(ttl),
+			TTL:        ttl,
 		}
 	}
 }
