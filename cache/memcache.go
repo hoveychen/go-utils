@@ -2,15 +2,14 @@
 package cache
 
 import (
-	"sync"
 	"time"
 
 	"github.com/hoveychen/go-utils"
+	"github.com/hoveychen/go-utils/gomap"
 )
 
 type MemCache struct {
-	Items  map[string]*cachedItem
-	lock   sync.RWMutex
+	items  *gomap.Map
 	ticker *time.Ticker
 }
 
@@ -20,64 +19,77 @@ type cachedItem struct {
 	TTL        time.Duration
 }
 
-func NewMemCache(checkInterval time.Duration) *MemCache {
+func NewMemCache(recycleInterval time.Duration) *MemCache {
 	c := &MemCache{
-		Items: map[string]*cachedItem{},
+		items: gomap.New(),
 	}
+
 	go func() {
-		ticker := time.NewTicker(checkInterval)
-		for range ticker.C {
-			c.checkExpire()
+		c.ticker = time.NewTicker(recycleInterval)
+		for range c.ticker.C {
+			c.removeExpired()
 		}
 	}()
 	return c
 }
 
-func (c *MemCache) checkExpire() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	// TODO(Yuheng): Optimize the expire checking algorithm.
+func (c *MemCache) removeExpired() {
 	now := goutils.GetNow()
-	for key, item := range c.Items {
+	for _, result := range c.items.GetItemsUnordered() {
+		item := result.Value.(*cachedItem)
+		if item == nil {
+			goutils.LogError("Unexpected values in memcache")
+			continue
+		}
 		if item.ExpireTime.Before(now) {
-			delete(c.Items, key)
+			c.items.Delete(result.Key)
 		}
 	}
 }
 
 func (c *MemCache) Get(key string) interface{} {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	i, hit := c.Items[key]
-	if hit {
-		// It's hit. Extends the expiring time by another TTL.
-		i.ExpireTime = goutils.GetNow().Add(i.TTL)
-		return i.Payload
-	} else {
+	i := c.items.Get(key)
+
+	if i == nil {
 		return nil
+	} else {
+		item := i.(*cachedItem)
+		if item == nil {
+			goutils.LogError("Unexpected values in memcache")
+			return nil
+		}
+		if item.ExpireTime.Before(goutils.GetNow()) {
+			// This item had expired.
+			c.items.Delete(key)
+			return nil
+		}
+		// It's hit. Extends the expiring time by another TTL.
+		item.ExpireTime = goutils.GetNow().Add(item.TTL)
+		return item.Payload
 	}
 }
 
 func (c *MemCache) UpsertWithTTL(key string, val interface{}, ttl time.Duration) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	i, hit := c.Items[key]
-	if hit {
-		i.Payload = val
-		i.TTL = ttl
-		i.ExpireTime = goutils.GetNow().Add(ttl)
+	i := c.items.Get(key)
+	if i != nil {
+		item := i.(*cachedItem)
+		if item == nil {
+			goutils.LogError("Unexpected values in memcache")
+			return
+		}
+		item.Payload = val
+		item.TTL = ttl
+		item.ExpireTime = goutils.GetNow().Add(ttl)
 	} else {
-		c.Items[key] = &cachedItem{
+		c.items.Set(key, &cachedItem{
 			Payload:    val,
 			ExpireTime: goutils.GetNow().Add(ttl),
 			TTL:        ttl,
-		}
+		})
 	}
 }
 
 func (c *MemCache) Stop() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.ticker.Stop()
-	c.Items = nil
+	c.items.Unwrap()
 }
