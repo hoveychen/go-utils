@@ -73,6 +73,16 @@ func (m *IntMap) Set(key string, value int) {
 	m.lock.Unlock()
 }
 
+func (m *IntMap) Add(key string, value int) {
+	m.lock.Lock()
+	if _, hit := m.data[key]; hit {
+		m.data[key] += value
+	} else {
+		m.data[key] = value
+	}
+	m.lock.Unlock()
+}
+
 func (m *IntMap) Delete(key string) {
 	m.lock.Lock()
 	delete(m.data, key)
