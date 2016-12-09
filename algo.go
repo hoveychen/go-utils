@@ -20,6 +20,17 @@ func DedupStrings(slice []string) []string {
 	return ret
 }
 
+// StringSliceContains determines whether a string is contained in another slice.
+// NOTE: This is just a convinient helper. It's computing time complexity is O(N), which may be a performance trap.
+func StringSliceContains(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
 type StringIntPair struct {
 	Key   string
 	Value int

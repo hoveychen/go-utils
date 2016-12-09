@@ -6,10 +6,11 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"github.com/hoveychen/go-utils"
 	"io"
 	"os"
 	"reflect"
+
+	"github.com/hoveychen/go-utils"
 )
 
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
