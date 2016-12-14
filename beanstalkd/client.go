@@ -60,20 +60,40 @@ func (c *Client) Len() int {
 	return ugent + ready
 }
 
+func (c *Client) isTimedOut(err error) bool {
+	if err != nil {
+		connErr, ok := err.(beanstalk.ConnError)
+		if ok && connErr.Err == beanstalk.ErrTimeout {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) isConnectionLost(err error) bool {
+	if err != nil {
+		connErr, ok := err.(beanstalk.ConnError)
+		if ok && connErr.Err.Error() == "EOF" {
+			return true
+		}
+	}
+	return false
+}
+
 // Get returns a job from a tube, blocking.
 func (c *Client) Get() []byte {
 	for {
 		id, data, err := c.tubeSet.Reserve(time.Minute)
 		if err != nil {
-			connErr, ok := err.(beanstalk.ConnError)
-			if ok && connErr.Err == beanstalk.ErrTimeout {
+			if c.isTimedOut(err) {
+				// Simply timed out. Retry again.
 				continue
 			}
-			goutils.LogError(err)
+			// Failed to connect to server.
+			goutils.LogError("Beanstalk Connection:", err)
 			// Holds for several seconds to wait for server recover.
-			time.Sleep(5 * time.Second)
-			// TODO(yuheng): Consider change another lib? It's so buggy that won't reconnect itself.
-			if ok && connErr.Err.Error() == "EOF" {
+			if c.isConnectionLost(err) {
+				time.Sleep(5 * time.Second)
 				c.Reconnect()
 			}
 			continue
@@ -85,6 +105,25 @@ func (c *Client) Get() []byte {
 
 		return data
 	}
+}
+
+// Get returns a job from a tube. Non-blocking. When no jobs, return nil.
+func (c *Client) GetOrNull() []byte {
+	id, data, err := c.tubeSet.Reserve(0)
+	if err != nil {
+		if c.isConnectionLost(err) {
+			c.Reconnect()
+		} else if !c.isTimedOut(err) {
+			goutils.LogError(err)
+		}
+		return nil
+	}
+
+	if err := c.conn.Delete(id); err != nil {
+		goutils.LogError(err, id)
+	}
+
+	return data
 }
 
 // Put the data into tube.
