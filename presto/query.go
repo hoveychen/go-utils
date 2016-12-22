@@ -21,20 +21,21 @@ package presto
 
 import (
 	"errors"
-	"flag"
-	go_presto "github.com/colinmarc/go-presto"
-	"github.com/hoveychen/go-utils"
 	"reflect"
 	"strings"
 	"time"
+
+	go_presto "github.com/colinmarc/go-presto"
+	"github.com/hoveychen/go-utils"
+	"github.com/hoveychen/go-utils/flags"
 )
 
 var (
-	defaultPrestoHost    = flag.String("prestoHost", "http://127.0.0.1:9997", "Presto server host address. Support multiple nodes with comma-delimited address.")
-	defaultPrestoUser    = flag.String("prestoUser", "", "Default presto user.")
-	defaultPrestoSource  = flag.String("prestoSource", "", "Default presto source")
-	defaultPrestoCatalog = flag.String("prestoCatalog", "hive", "Default presto catalog to query")
-	defaultPrestoSchema  = flag.String("prestoSchema", "event", "Default presto schema to query")
+	defaultPrestoHost    = flags.String("prestoHost", "http://127.0.0.1:9997", "Presto server host address. Support multiple nodes with comma-delimited address.")
+	defaultPrestoUser    = flags.String("prestoUser", "", "Default presto user.")
+	defaultPrestoSource  = flags.String("prestoSource", "", "Default presto source")
+	defaultPrestoCatalog = flags.String("prestoCatalog", "hive", "Default presto catalog to query")
+	defaultPrestoSchema  = flags.String("prestoSchema", "event", "Default presto schema to query")
 
 	defaultConfig *PrestoConfig
 )

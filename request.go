@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"flag"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/hoveychen/go-utils/flags"
+
 	"golang.org/x/net/proxy"
 )
 
 var (
-	proxyAddr      = flag.String("proxy", "", "Specify proxy address to fetch data")
-	proxyType      = flag.String("proxyType", "sock5", "Either sock5 or http for proxy.")
-	requestTimeout = flag.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
+	proxyAddr      = flags.String("proxy", "", "Specify proxy address to fetch data")
+	proxyType      = flags.String("proxyType", "sock5", "Either sock5 or http for proxy.")
+	requestTimeout = flags.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
 )
 
 func getDownloadClient() (*http.Client, error) {

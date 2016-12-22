@@ -3,16 +3,17 @@ package goutils
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"reflect"
 	"runtime"
+
+	"github.com/hoveychen/go-utils/flags"
 )
 
 var (
-	debug = flag.Bool("debug", false, "True to turn into debug mode.")
+	debug = flags.Bool("debug", false, "True to turn into debug mode.")
 
 	infoLog, debugLog, errLog, fatalLog *log.Logger
 )

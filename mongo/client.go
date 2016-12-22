@@ -2,18 +2,18 @@
 package mongo
 
 import (
-	"flag"
 	"sync"
 	"time"
 
 	"github.com/hoveychen/go-utils"
+	"github.com/hoveychen/go-utils/flags"
 	"github.com/hoveychen/go-utils/gomap"
 	"gopkg.in/mgo.v2"
 )
 
 var (
 	clientCache     = gomap.New()
-	numDbConcurrent = flag.Int("numDbConcurrent", 10, "Concurrent socket to db")
+	numDbConcurrent = flags.Int("numDbConcurrent", 10, "Concurrent socket to db")
 )
 
 type DbClient struct {

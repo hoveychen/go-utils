@@ -3,7 +3,6 @@ package mongo
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"sync"
@@ -11,10 +10,11 @@ import (
 	mgo "gopkg.in/mgo.v2"
 
 	goutils "github.com/hoveychen/go-utils"
+	"github.com/hoveychen/go-utils/flags"
 )
 
 var (
-	dbRouterJson = flag.String("dbRouterJson", "dbRouter.json", "Router config for different servers.")
+	dbRouterJson = flags.String("dbRouterJson", "dbRouter.json", "Router config for different servers.")
 
 	defaultRouter *Router
 	lock          sync.Mutex
