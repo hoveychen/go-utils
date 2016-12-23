@@ -3,13 +3,13 @@ package goutils
 import (
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/hoveychen/go-utils/flags"
+	"github.com/pkg/errors"
 
 	"golang.org/x/net/proxy"
 )
@@ -30,13 +30,13 @@ func getDownloadClient() (*http.Client, error) {
 	case "http":
 		proxyUrl, err := url.Parse(*proxyAddr)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "parse --proxyAddr")
 		}
 		httpTransport.Proxy = http.ProxyURL(proxyUrl)
 	case "sock5":
 		dialer, err := proxy.SOCKS5("tcp", *proxyAddr, nil, proxy.Direct)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "dial sock5")
 		}
 		httpTransport.Dial = dialer.Dial
 	default:
@@ -56,34 +56,34 @@ func getDownloadClient() (*http.Client, error) {
 func FetchData(path string) ([]byte, error) {
 	url, err := url.Parse(path)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "decode url")
 	}
 
 	switch url.Scheme {
 	case "http", "https":
 		client, err := getDownloadClient()
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "get download client")
 		}
 		req, err := http.NewRequest("GET", path, nil)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "new request")
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "do request")
 		}
 		defer resp.Body.Close()
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "read response")
 		}
 
 		return data, nil
 	case "":
 		data, err := ioutil.ReadFile(url.Path)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "read file")
 		}
 		return data, nil
 	default:
@@ -95,10 +95,10 @@ func FetchData(path string) ([]byte, error) {
 func FetchJson(path string, resp interface{}) error {
 	d, err := FetchData(path)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "fetch data")
 	}
 	if err := json.Unmarshal(d, resp); err != nil {
-		return err
+		return errors.Wrap(err, "decode json")
 	}
 	return nil
 }
@@ -107,10 +107,10 @@ func FetchJson(path string, resp interface{}) error {
 func FetchXml(path string, resp interface{}) error {
 	d, err := FetchData(path)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "fetch data")
 	}
 	if err := xml.Unmarshal(d, resp); err != nil {
-		return err
+		return errors.Wrap(err, "decode xml")
 	}
 	return nil
 }
