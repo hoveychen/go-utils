@@ -6,15 +6,14 @@ import (
 
 func DedupStrings(slice []string) []string {
 	m := map[string]bool{}
-	for _, i := range slice {
-		m[i] = true
-	}
-
-	ret := make([]string, len(m))
-	i := 0
-	for v, _ := range m {
-		ret[i] = v
-		i++
+	ret := []string{}
+	for _, s := range slice {
+		if m[s] {
+			continue
+		} else {
+			m[s] = true
+			ret = append(ret, s)
+		}
 	}
 
 	return ret
