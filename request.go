@@ -43,7 +43,7 @@ func init() {
 			}
 		}
 
-		downloadClient := &http.Client{Transport: httpTransport}
+		downloadClient = &http.Client{Transport: httpTransport}
 		downloadClient.Timeout = time.Duration(*requestTimeout) * time.Second
 	})
 }
