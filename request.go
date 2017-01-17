@@ -18,34 +18,34 @@ var (
 	proxyAddr      = flags.String("proxy", "", "Specify proxy address to fetch data")
 	proxyType      = flags.String("proxyType", "sock5", "Either sock5 or http for proxy.")
 	requestTimeout = flags.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
+	downloadClient *http.Client
 )
 
-func getDownloadClient() (*http.Client, error) {
-	if *proxyAddr == "" {
-		return http.DefaultClient, nil
-	}
-
-	httpTransport := &http.Transport{}
-	switch *proxyType {
-	case "http":
-		proxyUrl, err := url.Parse(*proxyAddr)
-		if err != nil {
-			return nil, errors.Wrap(err, "parse --proxyAddr")
+func init() {
+	PkgInit(func() {
+		httpTransport := &http.Transport{}
+		if *proxyAddr != "" {
+			switch *proxyType {
+			case "http":
+				proxyUrl, err := url.Parse(*proxyAddr)
+				if err != nil {
+					LogFatal("Failed to parse --proxyAddr", err)
+				}
+				httpTransport.Proxy = http.ProxyURL(proxyUrl)
+			case "sock5":
+				dialer, err := proxy.SOCKS5("tcp", *proxyAddr, nil, proxy.Direct)
+				if err != nil {
+					LogFatal("Failed to dial sock5", err)
+				}
+				httpTransport.Dial = dialer.Dial
+			default:
+				LogFatal("Unknown proxy type:", *proxyType)
+			}
 		}
-		httpTransport.Proxy = http.ProxyURL(proxyUrl)
-	case "sock5":
-		dialer, err := proxy.SOCKS5("tcp", *proxyAddr, nil, proxy.Direct)
-		if err != nil {
-			return nil, errors.Wrap(err, "dial sock5")
-		}
-		httpTransport.Dial = dialer.Dial
-	default:
-		return nil, errors.New("Unknown proxy type:" + *proxyType)
-	}
 
-	httpClient := &http.Client{Transport: httpTransport}
-	httpClient.Timeout = time.Duration(*requestTimeout) * time.Second
-	return httpClient, nil
+		downloadClient := &http.Client{Transport: httpTransport}
+		downloadClient.Timeout = time.Duration(*requestTimeout) * time.Second
+	})
 }
 
 // FetchData is a helper function to load local/remote data in the same function.
@@ -61,15 +61,11 @@ func FetchData(path string) ([]byte, error) {
 
 	switch url.Scheme {
 	case "http", "https":
-		client, err := getDownloadClient()
-		if err != nil {
-			return nil, errors.Wrap(err, "get download client")
-		}
 		req, err := http.NewRequest("GET", path, nil)
 		if err != nil {
 			return nil, errors.Wrap(err, "new request")
 		}
-		resp, err := client.Do(req)
+		resp, err := downloadClient.Do(req)
 		if err != nil {
 			return nil, errors.Wrap(err, "do request")
 		}
