@@ -45,7 +45,15 @@ func init() {
 
 		downloadClient = &http.Client{Transport: httpTransport}
 		downloadClient.Timeout = time.Duration(*requestTimeout) * time.Second
+		downloadClient.CheckRedirect = modifiedCheckRedirect
 	})
+}
+
+func modifiedCheckRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 15 {
+		return errors.New("stopped after 15 redirects")
+	}
+	return nil
 }
 
 // FetchData is a helper function to load local/remote data in the same function.
