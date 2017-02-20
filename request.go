@@ -1,6 +1,7 @@
 package goutils
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"io/ioutil"
@@ -56,6 +57,36 @@ func modifiedCheckRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
+func Get(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "New get request")
+	}
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Do get request")
+	}
+	return resp, nil
+}
+
+func PostJson(url string, data interface{}) (*http.Response, error) {
+	encodedData, err := json.Marshal(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "Encode json")
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(encodedData))
+	if err != nil {
+		return nil, errors.Wrap(err, "New post request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Do post request")
+	}
+	return resp, nil
+}
+
 // FetchData is a helper function to load local/remote data in the same function.
 // Local: goutils.FetchData("/absolute/path/to/file")
 // Remote: goutils.FetchData("https://www.google.com")
@@ -69,13 +100,9 @@ func FetchData(path string) ([]byte, error) {
 
 	switch url.Scheme {
 	case "http", "https":
-		req, err := http.NewRequest("GET", path, nil)
+		resp, err := Get(path)
 		if err != nil {
-			return nil, errors.Wrap(err, "new request")
-		}
-		resp, err := downloadClient.Do(req)
-		if err != nil {
-			return nil, errors.Wrap(err, "do request")
+			return nil, errors.Wrap(err, "Http get")
 		}
 		defer resp.Body.Close()
 		data, err := ioutil.ReadAll(resp.Body)
