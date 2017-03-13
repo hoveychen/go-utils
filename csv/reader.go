@@ -6,11 +6,13 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"github.com/hoveychen/go-utils"
 	"io"
 	"os"
 	"reflect"
 	"strings"
+
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hoveychen/go-utils"
 )
 
 type CsvReader struct {
@@ -107,6 +109,7 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 		}
 	}
 
+	var allError error
 	for idx, col := range r.fieldIdx {
 		if idx >= len(row) {
 			// Should never be here.
@@ -125,9 +128,9 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 			// only "123" will be parsed, while "abc" ignored.
 			_, err := fmt.Sscanf(row[idx], "%v", v.Addr().Interface())
 			if err != nil {
-				return err
+				allError = multierror.Append(allError, err)
 			}
 		}
 	}
-	return nil
+	return allError
 }
