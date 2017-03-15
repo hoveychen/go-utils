@@ -95,7 +95,7 @@ func PostJson(url string, data interface{}) (*http.Response, error) {
 func FetchData(path string) ([]byte, error) {
 	url, err := url.Parse(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "decode url")
+		return nil, errors.Wrap(err, "Decode url")
 	}
 
 	switch url.Scheme {
@@ -107,14 +107,17 @@ func FetchData(path string) ([]byte, error) {
 		defer resp.Body.Close()
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, errors.Wrap(err, "read response")
+			return nil, errors.Wrap(err, "Read response")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.New(resp.Status + ":" + string(data))
 		}
 
 		return data, nil
 	case "":
 		data, err := ioutil.ReadFile(url.Path)
 		if err != nil {
-			return nil, errors.Wrap(err, "read file")
+			return nil, errors.Wrap(err, "Read file")
 		}
 		return data, nil
 	default:
@@ -126,10 +129,10 @@ func FetchData(path string) ([]byte, error) {
 func FetchJson(path string, resp interface{}) error {
 	d, err := FetchData(path)
 	if err != nil {
-		return errors.Wrap(err, "fetch data")
+		return errors.Wrap(err, "Fetch data")
 	}
 	if err := json.Unmarshal(d, resp); err != nil {
-		return errors.Wrap(err, "decode json")
+		return errors.Wrap(err, "Decode json")
 	}
 	return nil
 }
@@ -138,10 +141,10 @@ func FetchJson(path string, resp interface{}) error {
 func FetchXml(path string, resp interface{}) error {
 	d, err := FetchData(path)
 	if err != nil {
-		return errors.Wrap(err, "fetch data")
+		return errors.Wrap(err, "Fetch data")
 	}
 	if err := xml.Unmarshal(d, resp); err != nil {
-		return errors.Wrap(err, "decode xml")
+		return errors.Wrap(err, "Decode xml")
 	}
 	return nil
 }
