@@ -1,3 +1,4 @@
+// This is a wrapper of standard http package, exposing out-of-the-box flags like proxy, timeout, json handling.
 package goutils
 
 import (
@@ -65,6 +66,24 @@ func Get(url string) (*http.Response, error) {
 	resp, err := downloadClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Do get request")
+	}
+	return resp, nil
+}
+
+func PostForm(uri string, data map[string]string) (*http.Response, error) {
+	values := url.Values{}
+	for k, v := range data {
+		values.Set(k, v)
+	}
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(values.Encode()))
+	if err != nil {
+		return nil, errors.Wrap(err, "New post request")
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Do post request")
 	}
 	return resp, nil
 }
