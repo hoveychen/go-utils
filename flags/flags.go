@@ -20,6 +20,9 @@ type sliceContainer struct {
 }
 
 func (s *sliceContainer) String() string {
+	if s == nil || s.S == nil {
+		return ""
+	}
 	return strings.Join(*s.S, ",")
 }
 
