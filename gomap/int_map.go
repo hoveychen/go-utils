@@ -135,24 +135,12 @@ func (m *IntMap) GetValues() []int {
 	return ret
 }
 
-type byIntValue []IntMapEntry
-
-func (slice byIntValue) Less(i, j int) bool {
-	return slice[i].Value < slice[j].Value
-}
-
-func (slice byIntValue) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
-
-func (slice byIntValue) Len() int {
-	return len(slice)
-}
-
 // GetTopN returns top N entries in desc value order.
 func (m *IntMap) GetTopN(n int) []IntMapEntry {
 	items := m.GetItemsUnordered()
-	sort.Sort(sort.Reverse(byIntValue(items)))
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Value > items[j].Value
+	})
 
 	if n > len(items) {
 		n = len(items)
