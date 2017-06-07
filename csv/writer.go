@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/hoveychen/go-utils"
 )
@@ -16,6 +17,7 @@ import (
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
 // shortcut to write to a file.
 type CsvWriter struct {
+	sync.Mutex
 	*csv.Writer
 	Headers  []string
 	file     *os.File
@@ -64,6 +66,8 @@ func (w *CsvWriter) buildFieldIndex(val reflect.Value) {
 }
 
 func (w *CsvWriter) WriteStruct(i interface{}) error {
+	w.Lock()
+	defer w.Unlock()
 	val := reflect.ValueOf(i)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -87,6 +91,8 @@ func (w *CsvWriter) WriteStruct(i interface{}) error {
 }
 
 func (w *CsvWriter) Close() error {
+	w.Lock()
+	defer w.Unlock()
 	w.Flush()
 	if w.file != nil {
 		return w.file.Close()
