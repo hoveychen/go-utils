@@ -2,6 +2,7 @@ package flags
 
 import (
 	"flag"
+	"log"
 	"strings"
 	"time"
 )
@@ -14,6 +15,27 @@ var (
 	intPtrs      = map[string]*int{}
 	slicePtrs    = map[string]*[]string{}
 )
+
+func ValidateNonZero(names ...string) {
+	for _, name := range names {
+		// NOTE: Bool flags not supported.
+		if stringPtrs[name] != nil && *stringPtrs[name] == "" {
+			log.Fatalf("Missing --%s", name)
+		}
+		if durationPtrs[name] != nil && int64(*durationPtrs[name]) == 0 {
+			log.Fatalf("Missing --%s", name)
+		}
+		if float64Ptrs[name] != nil && *float64Ptrs[name] == 0 {
+			log.Fatalf("Missing --%s", name)
+		}
+		if intPtrs[name] != nil && *intPtrs[name] == 0 {
+			log.Fatalf("Missing --%s", name)
+		}
+		if slicePtrs[name] != nil && len(*slicePtrs[name]) == 0 {
+			log.Fatalf("Missing --%s", name)
+		}
+	}
+}
 
 type sliceContainer struct {
 	S *[]string
