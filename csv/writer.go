@@ -9,24 +9,29 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/hoveychen/go-utils"
 )
+
+const defaultSliceDelimiter = "\n"
 
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
 // shortcut to write to a file.
 type CsvWriter struct {
 	sync.Mutex
 	*csv.Writer
-	Headers  []string
-	file     *os.File
-	fieldIdx []string
+	Headers        []string
+	file           *os.File
+	fieldIdx       []string
+	sliceDelimiter string
 }
 
 func NewCsvWriter(w io.Writer) *CsvWriter {
 	return &CsvWriter{
-		Writer: csv.NewWriter(w),
+		Writer:         csv.NewWriter(w),
+		sliceDelimiter: defaultSliceDelimiter,
 	}
 }
 
@@ -37,8 +42,9 @@ func NewFileCsvWriter(filename string) *CsvWriter {
 		return nil
 	}
 	return &CsvWriter{
-		Writer: csv.NewWriter(file),
-		file:   file,
+		Writer:         csv.NewWriter(file),
+		file:           file,
+		sliceDelimiter: defaultSliceDelimiter,
 	}
 }
 
@@ -65,6 +71,10 @@ func (w *CsvWriter) buildFieldIndex(val reflect.Value) {
 	}
 }
 
+func (w *CsvWriter) SetSliceDelimiter(delim string) {
+	w.sliceDelimiter = delim
+}
+
 func (w *CsvWriter) WriteStruct(i interface{}) error {
 	w.Lock()
 	defer w.Unlock()
@@ -83,8 +93,17 @@ func (w *CsvWriter) WriteStruct(i interface{}) error {
 
 	out := []string{}
 	for _, name := range w.fieldIdx {
-		v := val.FieldByName(name).Interface()
-		out = append(out, fmt.Sprintf("%v", v))
+		v := val.FieldByName(name)
+		switch v.Kind() {
+		case reflect.Slice:
+			var segs []string
+			for i := 0; i < v.Len(); i++ {
+				segs = append(segs, fmt.Sprint(v.Index(i).Interface()))
+			}
+			out = append(out, strings.Join(segs, w.sliceDelimiter))
+		default:
+			out = append(out, fmt.Sprint(v.Interface()))
+		}
 	}
 	w.Write(out)
 	return nil

@@ -17,14 +17,16 @@ import (
 
 type CsvReader struct {
 	*csv.Reader
-	Headers  []string
-	fieldIdx []string
-	file     *os.File
+	Headers        []string
+	fieldIdx       []string
+	file           *os.File
+	sliceDelimiter string
 }
 
 func NewCsvReader(r io.Reader) *CsvReader {
 	return &CsvReader{
-		Reader: csv.NewReader(r),
+		Reader:         csv.NewReader(r),
+		sliceDelimiter: defaultSliceDelimiter,
 	}
 }
 
@@ -35,8 +37,9 @@ func NewFileCsvReader(filename string) *CsvReader {
 		return nil
 	}
 	return &CsvReader{
-		Reader: csv.NewReader(file),
-		file:   file,
+		Reader:         csv.NewReader(file),
+		file:           file,
+		sliceDelimiter: defaultSliceDelimiter,
 	}
 }
 
@@ -45,6 +48,10 @@ func (r *CsvReader) Close() error {
 		return r.file.Close()
 	}
 	return nil
+}
+
+func (r *CsvReader) SetSliceDelimiter(delim string) {
+	r.sliceDelimiter = delim
 }
 
 func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
@@ -122,15 +129,26 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 			continue
 		}
 		v := val.FieldByName(col)
-		if v.Kind() == reflect.String {
-			v.SetString(row[idx])
-		} else {
+		switch v.Kind() {
+		case reflect.String:
 			// Try to parse the string to correspond type.
 			// NOTE: Using fmt.Sscanf("%v") will only parse the first
 			// space-delimited token. If the cell contains like "123 abc",
 			// only "123" will be parsed, while "abc" ignored.
+			v.SetString(row[idx])
+		case reflect.Slice:
+			segs := strings.Split(row[idx], r.sliceDelimiter)
+			slice := reflect.MakeSlice(v.Type(), len(segs), len(segs))
+			v.Set(slice)
+			for idx, s := range segs {
+				_, err := fmt.Sscanf(s, "%v", slice.Index(idx).Addr().Interface())
+				if err != nil && err != io.EOF {
+					allError = multierror.Append(allError, err)
+				}
+			}
+		default:
 			_, err := fmt.Sscanf(row[idx], "%v", v.Addr().Interface())
-			if err != nil {
+			if err != nil && err != io.EOF {
 				allError = multierror.Append(allError, err)
 			}
 		}
