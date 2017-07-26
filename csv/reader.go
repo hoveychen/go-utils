@@ -141,9 +141,14 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 			slice := reflect.MakeSlice(v.Type(), len(segs), len(segs))
 			v.Set(slice)
 			for idx, s := range segs {
-				_, err := fmt.Sscanf(s, "%v", slice.Index(idx).Addr().Interface())
-				if err != nil && err != io.EOF {
-					allError = multierror.Append(allError, err)
+				switch v.Type().Elem().Kind() {
+				case reflect.String:
+					slice.Index(idx).SetString(s)
+				default:
+					_, err := fmt.Sscanf(s, "%v", slice.Index(idx).Addr().Interface())
+					if err != nil && err != io.EOF {
+						allError = multierror.Append(allError, err)
+					}
 				}
 			}
 		default:
