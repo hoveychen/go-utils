@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/hoveychen/go-utils/flags"
@@ -21,10 +22,18 @@ var (
 	proxyType      = flags.String("proxyType", "sock5", "Either sock5 or http for proxy.")
 	requestTimeout = flags.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
 	downloadClient *http.Client
+	requestOnce    sync.Once
 )
 
-func init() {
-	PkgInit(func() {
+func modifiedCheckRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 15 {
+		return errors.New("stopped after 15 redirects")
+	}
+	return nil
+}
+
+func GetDownloadClient() *http.Client {
+	requestOnce.Do(func() {
 		httpTransport := &http.Transport{}
 		if *proxyAddr != "" {
 			switch *proxyType {
@@ -49,13 +58,8 @@ func init() {
 		downloadClient.Timeout = time.Duration(*requestTimeout) * time.Second
 		downloadClient.CheckRedirect = modifiedCheckRedirect
 	})
-}
 
-func modifiedCheckRedirect(req *http.Request, via []*http.Request) error {
-	if len(via) >= 15 {
-		return errors.New("stopped after 15 redirects")
-	}
-	return nil
+	return downloadClient
 }
 
 func Get(url string) (*http.Response, error) {
@@ -63,7 +67,7 @@ func Get(url string) (*http.Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "New get request")
 	}
-	resp, err := downloadClient.Do(req)
+	resp, err := GetDownloadClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Do get request")
 	}
@@ -81,7 +85,7 @@ func PostForm(uri string, data map[string]string) (*http.Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := downloadClient.Do(req)
+	resp, err := GetDownloadClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Do post request")
 	}
@@ -99,7 +103,7 @@ func PostJson(url string, data interface{}) (*http.Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := downloadClient.Do(req)
+	resp, err := GetDownloadClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Do post request")
 	}
