@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sync"
 
 	mgo "gopkg.in/mgo.v2"
@@ -14,7 +15,7 @@ import (
 )
 
 var (
-	dbRouterJson = flags.String("dbRouterJson", "dbRouter.json", "Router config for different servers.")
+	dbRouterJson = flags.String("dbRouterJson", "", "Router config for different servers. If empty, environment $DB_ROUTER will be adapted.")
 
 	defaultRouter *Router
 	lock          sync.Mutex
@@ -125,12 +126,23 @@ func (r *Router) DetermineServer(db, c string) (ret *Server) {
 	return r.Servers[0]
 }
 
+func getRouterConfigPath() string {
+	if *dbRouterJson != "" {
+		return *dbRouterJson
+	}
+	path := os.Getenv("DB_ROUTER")
+	if path != "" {
+		return path
+	}
+	return ""
+}
+
 func getDefaultRouter() *Router {
 	lock.Lock()
 	defer lock.Unlock()
 	once.Do(func() {
 		var err error
-		defaultRouter, err = LoadJsonFileRouter(*dbRouterJson)
+		defaultRouter, err = LoadJsonFileRouter(getRouterConfigPath())
 		if err != nil {
 			goutils.LogFatal(err)
 		}
