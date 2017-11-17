@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
+	"time"
 
 	mgo "gopkg.in/mgo.v2"
 
@@ -154,5 +155,22 @@ func getDefaultRouter() *Router {
 func Open(db, c string) (*mgo.Collection, *DbSession) {
 	router := getDefaultRouter()
 	s := router.DetermineServer(db, c)
-	return Dial(s.Address).Open(db, c)
+
+	col, session := Dial(s.Address).Open(db, c)
+	return col, session
+}
+
+// Open returns a mgo collection and session with long session timeout.
+// It's useful for task specific query, which may need dozens of time to
+// complete.
+// NOTE: It's risky to use such session in server, where may lead to infinite
+// no response status.
+func OpenWithLongTimeout(db, c string) (*mgo.Collection, *DbSession) {
+	router := getDefaultRouter()
+	s := router.DetermineServer(db, c)
+
+	col, session := Dial(s.Address).Open(db, c)
+	session.SetSocketTimeout(time.Minute * 30)
+	session.SetCursorTimeout(0)
+	return col, session
 }
