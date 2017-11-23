@@ -48,6 +48,14 @@ func StringSliceContains(slice []string, s string) bool {
 	return false
 }
 
+func ReverseStringSlice(slice []string) []string {
+	ret := make([]string, len(slice))
+	for i := 0; i < len(slice); i++ {
+		ret[i] = slice[len(slice)-1-i]
+	}
+	return ret
+}
+
 type StringIntPair struct {
 	Key   string
 	Value int

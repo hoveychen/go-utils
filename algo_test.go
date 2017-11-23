@@ -84,3 +84,36 @@ func TestToTitle(t *testing.T) {
 		}
 	}
 }
+
+func TestReverseStringSlice(t *testing.T) {
+	inputs := [][]string{
+		[]string{},
+		[]string{""},
+		[]string{"a"},
+		[]string{"a", "b", "c", "d"},
+		[]string{"aa", "a", "b", "c"},
+	}
+
+	expects := [][]string{
+		[]string{},
+		[]string{""},
+		[]string{"a"},
+		[]string{"d", "c", "b", "a"},
+		[]string{"c", "b", "a", "aa"},
+	}
+
+	for idx, in := range inputs {
+		actual := ReverseStringSlice(in)
+		expect := expects[idx]
+		if len(actual) != len(expect) {
+			t.Errorf("Len not the same. %v, %v", expect, actual)
+		}
+
+		for i := 0; i < len(actual); i++ {
+			if actual[i] != expect[i] {
+				t.Errorf("Value not the same. %v, %v", expect[i], actual[i])
+			}
+		}
+	}
+
+}
