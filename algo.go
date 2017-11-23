@@ -2,7 +2,25 @@ package goutils
 
 import (
 	"sort"
+	"strings"
 )
+
+// ToTitle converts the first letter of every term in a sentence upper case.
+// It's similar to strings.Title(), except it will only separate strings by space,
+// so that "women's clothes" will be transformed to "Women's Clothes" instead of
+// "Women'S Clothes".
+func ToTitle(s string) string {
+	var outs []string
+	parts := strings.Split(s, " ")
+	for _, part := range parts {
+		if len(part) > 0 {
+			outs = append(outs, strings.ToUpper(part[0:1])+strings.ToLower(part[1:]))
+		} else {
+			outs = append(outs, "")
+		}
+	}
+	return strings.Join(outs, " ")
+}
 
 func DedupStrings(slice []string) []string {
 	m := map[string]bool{}

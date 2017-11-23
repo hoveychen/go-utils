@@ -50,3 +50,37 @@ func TestIterStringIntMap(t *testing.T) {
 		}
 	}
 }
+
+func TestToTitle(t *testing.T) {
+	inputs := []string{
+		"",
+		"a",
+		"abc",
+		"abc def",
+		"abc def ",
+		" abc def",
+		" abc def ",
+		"women's clothes",
+		"taobao:xxxx",
+	}
+
+	expects := []string{
+		"",
+		"A",
+		"Abc",
+		"Abc Def",
+		"Abc Def ",
+		" Abc Def",
+		" Abc Def ",
+		"Women's Clothes",
+		"Taobao:xxxx",
+	}
+
+	for idx, in := range inputs {
+		actual := ToTitle(in)
+		expect := expects[idx]
+		if actual != expect {
+			t.Errorf("Expect: %s, Actual: %s", expect, actual)
+		}
+	}
+}
