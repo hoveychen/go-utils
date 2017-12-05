@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ernesto-jimenez/httplogger"
 	"github.com/hoveychen/go-utils/flags"
 	"github.com/pkg/errors"
 
@@ -22,6 +23,7 @@ var (
 	proxyAddr      = flags.String("proxy", "", "Specify proxy address to fetch data")
 	proxyType      = flags.String("proxyType", "sock5", "Either sock5 or http for proxy.")
 	requestTimeout = flags.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
+	logAccess      = flags.Bool("logAccess", false, "True to log every requests.")
 	downloadClient *http.Client
 	requestOnce    sync.Once
 )
@@ -31,6 +33,20 @@ func modifiedCheckRedirect(req *http.Request, via []*http.Request) error {
 		return errors.New("stopped after 15 redirects")
 	}
 	return nil
+}
+
+type httpLogger struct{}
+
+func (l *httpLogger) LogRequest(req *http.Request) {
+	LogInfo("[Request]", req.Method, req.URL.String())
+}
+
+func (l *httpLogger) LogResponse(req *http.Request, res *http.Response, err error, duration time.Duration) {
+	if err != nil {
+		LogError("[Response]", err, req.URL.String())
+		return
+	}
+	LogInfo("[Response]", req.Method, res.StatusCode, duration.Seconds(), req.URL.String())
 }
 
 func GetDownloadClient() *http.Client {
@@ -58,7 +74,13 @@ func GetDownloadClient() *http.Client {
 			}
 		}
 
-		downloadClient = &http.Client{Transport: httpTransport}
+		var roundTripper http.RoundTripper = httpTransport
+
+		if *logAccess {
+			roundTripper = httplogger.NewLoggedTransport(roundTripper, &httpLogger{})
+		}
+
+		downloadClient = &http.Client{Transport: roundTripper}
 		downloadClient.Timeout = time.Duration(*requestTimeout) * time.Second
 		downloadClient.CheckRedirect = modifiedCheckRedirect
 	})
