@@ -3,6 +3,7 @@ package goutils
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
 	"io/ioutil"
@@ -43,6 +44,9 @@ func GetDownloadClient() *http.Client {
 					LogFatal("Failed to parse --proxyAddr", err)
 				}
 				httpTransport.Proxy = http.ProxyURL(proxyUrl)
+				httpTransport.TLSClientConfig = &tls.Config{
+					InsecureSkipVerify: true,
+				}
 			case "sock5":
 				dialer, err := proxy.SOCKS5("tcp", *proxyAddr, nil, proxy.Direct)
 				if err != nil {
