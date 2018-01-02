@@ -21,3 +21,13 @@ func CompileRegexp(pattern string) (*regexp.Regexp, error) {
 	cachedError[pattern] = err
 	return re, err
 }
+
+// MatchStringRegexp is the same as regexp.MatchString(),
+// except it use the cached version of compiled pattern.
+func MatchStringRegexp(pattern, s string) (matched bool, err error) {
+	re, err := CompileRegexp(pattern)
+	if err != nil {
+		return false, err
+	}
+	return re.MatchString(s), nil
+}
