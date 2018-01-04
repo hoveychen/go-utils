@@ -3,6 +3,7 @@ package goutils
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
@@ -88,11 +89,12 @@ func GetDownloadClient() *http.Client {
 	return downloadClient
 }
 
-func Get(url string) (*http.Response, error) {
+func GetWithContext(ctx context.Context, url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "New get request")
 	}
+	req = req.WithContext(ctx)
 	resp, err := GetDownloadClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Do get request")
@@ -100,7 +102,11 @@ func Get(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func PostForm(uri string, data map[string]string) (*http.Response, error) {
+func Get(url string) (*http.Response, error) {
+	return GetWithContext(context.Background(), url)
+}
+
+func PostFormWithContext(ctx context.Context, uri string, data map[string]string) (*http.Response, error) {
 	values := url.Values{}
 	for k, v := range data {
 		values.Set(k, v)
@@ -109,6 +115,7 @@ func PostForm(uri string, data map[string]string) (*http.Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "New post request")
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := GetDownloadClient().Do(req)
@@ -118,7 +125,11 @@ func PostForm(uri string, data map[string]string) (*http.Response, error) {
 	return resp, nil
 }
 
-func PostJson(url string, data interface{}) (*http.Response, error) {
+func PostForm(ctx context.Context, uri string, data map[string]string) (*http.Response, error) {
+	return PostForm(context.Background(), uri, data)
+}
+
+func PostJsonWithContext(ctx context.Context, url string, data interface{}) (*http.Response, error) {
 	encodedData, err := json.Marshal(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "Encode json")
@@ -127,6 +138,7 @@ func PostJson(url string, data interface{}) (*http.Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "New post request")
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := GetDownloadClient().Do(req)
@@ -136,12 +148,11 @@ func PostJson(url string, data interface{}) (*http.Response, error) {
 	return resp, nil
 }
 
-// FetchData is a helper function to load local/remote data in the same function.
-// Local: goutils.FetchData("/absolute/path/to/file")
-// Remote: goutils.FetchData("https://www.google.com")
-// Also, it's integrated with proxy in flags.
-// TODO(yuheng): Allow more options, while keeping easy use.
-func FetchData(path string) ([]byte, error) {
+func PostJson(url string, data interface{}) (*http.Response, error) {
+	return PostJsonWithContext(context.Background(), url, data)
+}
+
+func FetchDataWithContext(ctx context.Context, path string) ([]byte, error) {
 	url, err := url.Parse(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "Decode url")
@@ -149,7 +160,7 @@ func FetchData(path string) ([]byte, error) {
 
 	switch url.Scheme {
 	case "http", "https":
-		resp, err := Get(path)
+		resp, err := GetWithContext(ctx, path)
 		if err != nil {
 			return nil, errors.Wrap(err, "Http get")
 		}
@@ -174,9 +185,17 @@ func FetchData(path string) ([]byte, error) {
 	}
 }
 
-// FetchJson is a wrapper to call FetchData() and parse results from json.
-func FetchJson(path string, resp interface{}) error {
-	d, err := FetchData(path)
+// FetchData is a helper function to load local/remote data in the same function.
+// Local: goutils.FetchData("/absolute/path/to/file")
+// Remote: goutils.FetchData("https://www.google.com")
+// Also, it's integrated with proxy in flags.
+// TODO(yuheng): Allow more options, while keeping easy use.
+func FetchData(path string) ([]byte, error) {
+	return FetchDataWithContext(context.Background(), path)
+}
+
+func FetchJsonWithContext(ctx context.Context, path string, resp interface{}) error {
+	d, err := FetchDataWithContext(ctx, path)
 	if err != nil {
 		return errors.Wrap(err, "Fetch data")
 	}
@@ -186,9 +205,13 @@ func FetchJson(path string, resp interface{}) error {
 	return nil
 }
 
-// FetchXml is a wrapper to call FetchData() and parse results from xml.
-func FetchXml(path string, resp interface{}) error {
-	d, err := FetchData(path)
+// FetchJson is a wrapper to call FetchData() and parse results from json.
+func FetchJson(path string, resp interface{}) error {
+	return FetchJsonWithContext(context.Background(), path, resp)
+}
+
+func FetchXmlWithContext(ctx context.Context, path string, resp interface{}) error {
+	d, err := FetchDataWithContext(ctx, path)
 	if err != nil {
 		return errors.Wrap(err, "Fetch data")
 	}
@@ -196,4 +219,9 @@ func FetchXml(path string, resp interface{}) error {
 		return errors.Wrap(err, "Decode xml")
 	}
 	return nil
+}
+
+// FetchXml is a wrapper to call FetchData() and parse results from xml.
+func FetchXml(path string, resp interface{}) error {
+	return FetchXmlWithContext(context.Background(), path, resp)
 }
