@@ -15,6 +15,7 @@ type LocalRepos struct {
 	refreshInterval time.Duration
 	refreshing      sync.RWMutex
 	data            map[string]Hashable
+	ticker          *time.Ticker
 
 	entryType reflect.Type
 }
@@ -54,8 +55,9 @@ func NewLocalRepos(db, col string, entryTmpl Hashable, opts ...ReposOption) *Loc
 func (r *LocalRepos) Init() {
 	r.reloadEntries()
 
+	r.ticker = time.NewTicker(r.refreshInterval)
 	go func() {
-		for range time.Tick(r.refreshInterval) {
+		for range r.ticker.C {
 			r.reloadEntries()
 		}
 	}()
@@ -97,4 +99,10 @@ func (r *LocalRepos) Len() int {
 	r.refreshing.RLock()
 	defer r.refreshing.RUnlock()
 	return len(r.data)
+}
+
+func (r *LocalRepos) Close() {
+	if r.ticker != nil {
+		r.ticker.Stop()
+	}
 }
