@@ -126,7 +126,7 @@ func PostFormWithContext(ctx context.Context, uri string, data map[string]string
 }
 
 func PostForm(uri string, data map[string]string) (*http.Response, error) {
-	return PostForm(context.Background(), uri, data)
+	return PostFormWithContext(context.Background(), uri, data)
 }
 
 func PostJsonWithContext(ctx context.Context, url string, data interface{}) (*http.Response, error) {
