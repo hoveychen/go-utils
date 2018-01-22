@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
-	"time"
 
 	mgo "gopkg.in/mgo.v2"
 
@@ -169,8 +168,6 @@ func OpenWithLongTimeout(db, c string) (*mgo.Collection, *DbSession) {
 	router := getDefaultRouter()
 	s := router.DetermineServer(db, c)
 
-	col, session := Dial(s.Address).Open(db, c)
-	session.SetSocketTimeout(time.Minute * 30)
-	session.SetCursorTimeout(0)
+	col, session := Dial(s.Address).OpenWithLongTimeout(db, c)
 	return col, session
 }

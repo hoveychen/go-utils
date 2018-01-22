@@ -67,6 +67,13 @@ func (c *DbClient) Open(db, collection string) (*mgo.Collection, *DbSession) {
 	return ownSession.DB(db).C(collection), ownSession
 }
 
+func (c *DbClient) OpenWithLongTimeout(db, collection string) (*mgo.Collection, *DbSession) {
+	col, session := c.Open(db, collection)
+	session.SetSocketTimeout(time.Minute * 30)
+	session.SetCursorTimeout(0)
+	return col, session
+}
+
 // Wait blocks the goroutine until all sessions are closed.
 func (c *DbClient) Wait() {
 	c.dbWaitGroup.Wait()
