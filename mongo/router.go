@@ -8,8 +8,7 @@ import (
 	"os"
 	"sync"
 
-	mgo "gopkg.in/mgo.v2"
-
+	"github.com/globalsign/mgo"
 	goutils "github.com/hoveychen/go-utils"
 	"github.com/hoveychen/go-utils/flags"
 )

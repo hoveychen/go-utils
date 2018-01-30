@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/globalsign/mgo"
 	"github.com/hoveychen/go-utils"
 	"github.com/hoveychen/go-utils/flags"
 	"github.com/hoveychen/go-utils/gomap"
-	"gopkg.in/mgo.v2"
 )
 
 var (
