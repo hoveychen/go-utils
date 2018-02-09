@@ -4,18 +4,21 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/globalsign/mgo/bson"
 )
 
 // LocalRepos is a Key/Value map that cached the data from a particular mongodb
 // to local memory, and keep refreshing data in certian intervals.
 // It's useful for small collection with high read I/O.
 type LocalRepos struct {
+	sync.RWMutex
 	database        string
 	collection      string
 	refreshInterval time.Duration
-	refreshing      sync.RWMutex
 	data            map[string]Hashable
 	ticker          *time.Ticker
+	query           bson.M
 
 	entryType reflect.Type
 }
@@ -27,6 +30,12 @@ type ReposOption func(*LocalRepos)
 func WithRefreshInterval(dur time.Duration) ReposOption {
 	return func(repos *LocalRepos) {
 		repos.refreshInterval = dur
+	}
+}
+
+func WithQuery(query bson.M) ReposOption {
+	return func(repos *LocalRepos) {
+		repos.query = query
 	}
 }
 
@@ -68,7 +77,7 @@ func (r *LocalRepos) reloadEntries() error {
 	defer s.Close()
 
 	newData := map[string]Hashable{}
-	iter := c.Find(nil).Iter()
+	iter := c.Find(r.query).Iter()
 	for {
 		newVal := reflect.New(r.entryType).Interface().(Hashable)
 		if !iter.Next(newVal) {
@@ -82,22 +91,32 @@ func (r *LocalRepos) reloadEntries() error {
 		return iter.Err()
 	}
 
-	r.refreshing.Lock()
-	defer r.refreshing.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	r.data = newData
 	return nil
 }
 
+func (r *LocalRepos) All() []Hashable {
+	r.RLock()
+	defer r.RUnlock()
+	var ret []Hashable
+	for _, item := range r.data {
+		ret = append(ret, item)
+	}
+	return ret
+}
+
 func (r *LocalRepos) Get(id string) Hashable {
-	r.refreshing.RLock()
-	defer r.refreshing.RUnlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.data[id]
 }
 
 func (r *LocalRepos) Len() int {
-	r.refreshing.RLock()
-	defer r.refreshing.RUnlock()
+	r.RLock()
+	defer r.RUnlock()
 	return len(r.data)
 }
 
