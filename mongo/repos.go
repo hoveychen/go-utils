@@ -19,6 +19,7 @@ type LocalRepos struct {
 	data            map[string]Hashable
 	ticker          *time.Ticker
 	query           bson.M
+	project         bson.M
 
 	entryType reflect.Type
 }
@@ -36,6 +37,12 @@ func WithRefreshInterval(dur time.Duration) ReposOption {
 func WithQuery(query bson.M) ReposOption {
 	return func(repos *LocalRepos) {
 		repos.query = query
+	}
+}
+
+func WithProjection(project bson.M) ReposOption {
+	return func(repos *LocalRepos) {
+		repos.project = project
 	}
 }
 
@@ -77,7 +84,11 @@ func (r *LocalRepos) reloadEntries() error {
 	defer s.Close()
 
 	newData := map[string]Hashable{}
-	iter := c.Find(r.query).Iter()
+	find := c.Find(r.query)
+	if r.project != nil {
+		find = find.Select(r.project)
+	}
+	iter := find.Iter()
 	for {
 		newVal := reflect.New(r.entryType).Interface().(Hashable)
 		if !iter.Next(newVal) {
