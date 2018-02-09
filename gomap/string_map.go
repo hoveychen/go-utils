@@ -8,8 +8,8 @@ import (
 
 // StringMap is a Map with values as built-in string type.
 type StringMap struct {
+	sync.RWMutex
 	data map[string]string
-	lock sync.RWMutex
 }
 
 type StringMapEntry struct {
@@ -33,8 +33,8 @@ func WrapStringMap(m map[string]string) *StringMap {
 }
 
 func (m *StringMap) Unwrap() map[string]string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	d := m.data
 	m.data = nil
@@ -42,8 +42,8 @@ func (m *StringMap) Unwrap() map[string]string {
 }
 
 func (m *StringMap) Clone() *StringMap {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	newData := map[string]string{}
 	for k, v := range m.data {
@@ -54,47 +54,47 @@ func (m *StringMap) Clone() *StringMap {
 }
 
 func (m *StringMap) MarshalJSON() ([]byte, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	d, err := json.Marshal(m.data)
 	return d, err
 }
 
 func (m *StringMap) UnmarshalJSON(d []byte) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	return json.Unmarshal(d, &m.data)
 }
 
 func (m *StringMap) Set(key string, value string) {
-	m.lock.Lock()
+	m.Lock()
 	m.data[key] = value
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *StringMap) Delete(key string) {
-	m.lock.Lock()
+	m.Lock()
 	delete(m.data, key)
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *StringMap) Get(key string) string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return m.data[key]
 }
 
 func (m *StringMap) Exists(key string) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	_, ok := m.data[key]
 	return ok
 }
 
 func (m *StringMap) GetKeysUnordered() []string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]string, len(m.data))
 	i := 0
@@ -113,8 +113,8 @@ func (m *StringMap) GetKeys() []string {
 }
 
 func (m *StringMap) GetValues() []string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	ret := make([]string, len(m.data))
 	i := 0
 	for _, v := range m.data {
@@ -126,8 +126,8 @@ func (m *StringMap) GetValues() []string {
 }
 
 func (m *StringMap) GetItemsUnordered() []StringMapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]StringMapEntry, len(m.data))
 	i := 0
@@ -143,8 +143,8 @@ func (m *StringMap) GetItemsUnordered() []StringMapEntry {
 }
 
 func (m *StringMap) GetItems() []StringMapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	keys := m.GetKeys()
 	ret := make([]StringMapEntry, len(keys))
@@ -161,7 +161,7 @@ func (m *StringMap) GetItems() []StringMapEntry {
 }
 
 func (m *StringMap) Len() int {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return len(m.data)
 }

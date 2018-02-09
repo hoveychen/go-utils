@@ -10,8 +10,8 @@ import (
 // It may not be quite efficient, but most of method should meet daily need for multi-goroutine
 // environment.
 type Map struct {
+	sync.RWMutex
 	data map[string]interface{}
-	lock sync.RWMutex
 }
 
 // MapEntry is the return structure for iterating.
@@ -42,8 +42,8 @@ func Wrap(m map[string]interface{}) *Map {
 // which means this map structure won't function any more but in the ease of
 // the risk of memory leak.
 func (m *Map) Unwrap() map[string]interface{} {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	d := m.data
 	m.data = nil
@@ -52,8 +52,8 @@ func (m *Map) Unwrap() map[string]interface{} {
 
 // Clone shallow copies the keys and values to a new map structure.
 func (m *Map) Clone() *Map {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	newData := map[string]interface{}{}
 	for k, v := range m.data {
@@ -65,41 +65,41 @@ func (m *Map) Clone() *Map {
 
 // MarshalJSON implements the json.Marshaller interface.
 func (m *Map) MarshalJSON() ([]byte, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	d, err := json.Marshal(m.data)
 	return d, err
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (m *Map) UnmarshalJSON(d []byte) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	return json.Unmarshal(d, &m.data)
 }
 
 func (m *Map) Set(key string, value interface{}) {
-	m.lock.Lock()
+	m.Lock()
 	m.data[key] = value
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *Map) Delete(key string) {
-	m.lock.Lock()
+	m.Lock()
 	delete(m.data, key)
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *Map) Get(key string) interface{} {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return m.data[key]
 }
 
 func (m *Map) Exists(key string) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	_, ok := m.data[key]
 	return ok
 }
@@ -110,16 +110,16 @@ func (m *Map) Exists(key string) bool {
 // IMPORTANT NOTE: The createFn should not invoke any method in this
 // map, otherwise it will DEADLOCK.
 func (m *Map) GetOrCreate(key string, createFn func() interface{}) interface{} {
-	m.lock.RLock()
+	m.RLock()
 	_, ok := m.data[key]
 	if ok {
-		defer m.lock.RUnlock()
+		defer m.RUnlock()
 		return m.data[key]
 	} else {
 		// Call createFn to generate the new object set to key.
-		m.lock.RUnlock()
-		m.lock.Lock()
-		defer m.lock.Unlock()
+		m.RUnlock()
+		m.Lock()
+		defer m.Unlock()
 		value := createFn()
 		m.data[key] = value
 		return value
@@ -128,8 +128,8 @@ func (m *Map) GetOrCreate(key string, createFn func() interface{}) interface{} {
 
 // GetKeysUnordered returns all the *copy* of keys, but no order is guaranteed.
 func (m *Map) GetKeysUnordered() []string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]string, len(m.data))
 	i := 0
@@ -150,8 +150,8 @@ func (m *Map) GetKeys() []string {
 
 // GetValues returns all the *copy* of values, but no order is guaranteed.
 func (m *Map) GetValues() []interface{} {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	ret := make([]interface{}, len(m.data))
 	i := 0
 	for _, v := range m.data {
@@ -164,8 +164,8 @@ func (m *Map) GetValues() []interface{} {
 
 // GetItemsUnordered returns all the *copy* of key/value pairs, but no order is guaranteed.
 func (m *Map) GetItemsUnordered() []MapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]MapEntry, len(m.data))
 	i := 0
@@ -182,8 +182,8 @@ func (m *Map) GetItemsUnordered() []MapEntry {
 
 // GetItems returns all the *copy* of key/value pairs, and sort them by keys in alphabet order.
 func (m *Map) GetItems() []MapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	keys := m.GetKeys()
 	ret := make([]MapEntry, len(keys))
@@ -201,7 +201,7 @@ func (m *Map) GetItems() []MapEntry {
 
 // Len returns the size of the map.
 func (m *Map) Len() int {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return len(m.data)
 }

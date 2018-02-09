@@ -8,8 +8,8 @@ import "sort"
 // Like avg, sum, peek-trimming dataset.
 // TODO(yuheng): Implmenet data compacting when memory grows to unignorable size.
 type Counter struct {
+	sync.RWMutex
 	data map[int]int
-	lock sync.RWMutex
 }
 
 func NewCounter() *Counter {
@@ -19,16 +19,16 @@ func NewCounter() *Counter {
 }
 
 func (c *Counter) Add(value ...int) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	for _, v := range value {
 		c.data[v]++
 	}
 }
 
 func (c *Counter) AddMultipleTimes(value, times int) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	c.data[value] += times
 }
 
@@ -51,8 +51,8 @@ func (c *Counter) Mean() int {
 }
 
 func (c *Counter) Sum() int {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 
 	sum := 0
 	for v, num := range c.data {
@@ -62,8 +62,8 @@ func (c *Counter) Sum() int {
 }
 
 func (c *Counter) Len() int {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 
 	n := 0
 	for _, num := range c.data {
@@ -73,8 +73,8 @@ func (c *Counter) Len() int {
 }
 
 func (c *Counter) Avg() float64 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 	n := c.Len()
 	if n == 0 {
 		return 0.0
@@ -84,8 +84,8 @@ func (c *Counter) Avg() float64 {
 
 // Deviation returns the population standard deviation of numbers.
 func (c *Counter) Deviation() float64 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 
 	n := c.Len()
 	if n == 0 {

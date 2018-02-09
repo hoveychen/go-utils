@@ -8,8 +8,8 @@ import (
 
 // FloatMap is a Map with values as built-in float64 type.
 type FloatMap struct {
+	sync.RWMutex
 	data map[string]float64
-	lock sync.RWMutex
 }
 
 type FloatMapEntry struct {
@@ -33,8 +33,8 @@ func WrapFloatMap(m map[string]float64) *FloatMap {
 }
 
 func (m *FloatMap) Unwrap() map[string]float64 {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	d := m.data
 	m.data = nil
@@ -42,8 +42,8 @@ func (m *FloatMap) Unwrap() map[string]float64 {
 }
 
 func (m *FloatMap) Clone() *FloatMap {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	newData := map[string]float64{}
 	for k, v := range m.data {
@@ -54,47 +54,47 @@ func (m *FloatMap) Clone() *FloatMap {
 }
 
 func (m *FloatMap) MarshalJSON() ([]byte, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	d, err := json.Marshal(m.data)
 	return d, err
 }
 
 func (m *FloatMap) UnmarshalJSON(d []byte) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	return json.Unmarshal(d, &m.data)
 }
 
 func (m *FloatMap) Set(key string, value float64) {
-	m.lock.Lock()
+	m.Lock()
 	m.data[key] = value
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *FloatMap) Delete(key string) {
-	m.lock.Lock()
+	m.Lock()
 	delete(m.data, key)
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *FloatMap) Get(key string) float64 {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return m.data[key]
 }
 
 func (m *FloatMap) Exists(key string) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	_, ok := m.data[key]
 	return ok
 }
 
 func (m *FloatMap) GetKeysUnordered() []string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]string, len(m.data))
 	i := 0
@@ -113,8 +113,8 @@ func (m *FloatMap) GetKeys() []string {
 }
 
 func (m *FloatMap) GetValues() []float64 {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	ret := make([]float64, len(m.data))
 	i := 0
 	for _, v := range m.data {
@@ -126,8 +126,8 @@ func (m *FloatMap) GetValues() []float64 {
 }
 
 func (m *FloatMap) GetItemsUnordered() []FloatMapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]FloatMapEntry, len(m.data))
 	i := 0
@@ -143,8 +143,8 @@ func (m *FloatMap) GetItemsUnordered() []FloatMapEntry {
 }
 
 func (m *FloatMap) GetItems() []FloatMapEntry {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	keys := m.GetKeys()
 	ret := make([]FloatMapEntry, len(keys))
@@ -161,7 +161,7 @@ func (m *FloatMap) GetItems() []FloatMapEntry {
 }
 
 func (m *FloatMap) Len() int {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return len(m.data)
 }

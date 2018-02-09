@@ -8,8 +8,8 @@ import (
 
 // Set is a Map with values as built-in bool type.
 type Set struct {
+	sync.RWMutex
 	data map[string]bool
-	lock sync.RWMutex
 }
 
 func NewSet() *Set {
@@ -39,8 +39,8 @@ func WrapSet(m map[string]bool) *Set {
 }
 
 func (m *Set) Unwrap() map[string]bool {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	d := m.data
 	m.data = nil
@@ -48,8 +48,8 @@ func (m *Set) Unwrap() map[string]bool {
 }
 
 func (m *Set) Clone() *Set {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	newData := map[string]bool{}
 	for k, v := range m.data {
@@ -60,16 +60,16 @@ func (m *Set) Clone() *Set {
 }
 
 func (m *Set) MarshalJSON() ([]byte, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	d, err := json.Marshal(m.data)
 
 	return d, err
 }
 
 func (m *Set) UnmarshalJSON(d []byte) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.Lock()
+	defer m.Unlock()
 	if err := json.Unmarshal(d, &m.data); err != nil {
 		return err
 	} else {
@@ -79,26 +79,26 @@ func (m *Set) UnmarshalJSON(d []byte) error {
 }
 
 func (m *Set) Add(elem string) {
-	m.lock.Lock()
+	m.Lock()
 	m.data[elem] = true
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *Set) Remove(elem string) {
-	m.lock.Lock()
+	m.Lock()
 	delete(m.data, elem)
-	m.lock.Unlock()
+	m.Unlock()
 }
 
 func (m *Set) Contains(elem string) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return m.data[elem]
 }
 
 func (m *Set) GetElementsUnordered() []string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := []string{}
 	for k, v := range m.data {
@@ -116,7 +116,7 @@ func (m *Set) GetElements() []string {
 }
 
 func (m *Set) Len() int {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 	return len(m.data)
 }
