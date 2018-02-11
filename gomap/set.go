@@ -18,6 +18,16 @@ func NewSet() *Set {
 	}
 }
 
+func NewSetFromSlice(s []string) *Set {
+	data := map[string]bool{}
+	for _, k := range s {
+		data[k] = true
+	}
+	return &Set{
+		data: data,
+	}
+}
+
 func (m *Set) removeInvalid() {
 	// A book keeper to make sure no invalid (false value) values leaks to outside.
 	for k, v := range m.data {
