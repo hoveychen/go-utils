@@ -149,12 +149,15 @@ func getDefaultRouter() *Router {
 	return defaultRouter
 }
 
-// Open returns a mgo collection and session.
-func Open(db, c string) (*mgo.Collection, *DbSession) {
+func getClient(db, c string) *DbClient {
 	router := getDefaultRouter()
 	s := router.DetermineServer(db, c)
+	return Dial(s.Address)
+}
 
-	col, session := Dial(s.Address).Open(db, c)
+// Open returns a mgo collection and session.
+func Open(db, c string) (*mgo.Collection, *DbSession) {
+	col, session := getClient(db, c).Open(db, c)
 	return col, session
 }
 

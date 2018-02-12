@@ -20,6 +20,7 @@ type LocalRepos struct {
 	ticker          *time.Ticker
 	query           bson.M
 	project         bson.M
+	client          *DbClient
 
 	entryType reflect.Type
 }
@@ -27,6 +28,11 @@ type LocalRepos struct {
 const defaultRefreshInterval = time.Minute * 5
 
 type ReposOption func(*LocalRepos)
+
+type ReposKVEntry struct {
+	Key   string
+	Value Hashable
+}
 
 func WithRefreshInterval(dur time.Duration) ReposOption {
 	return func(repos *LocalRepos) {
@@ -46,6 +52,12 @@ func WithProjection(project bson.M) ReposOption {
 	}
 }
 
+func WithClient(client *DbClient) ReposOption {
+	return func(repos *LocalRepos) {
+		repos.client = client
+	}
+}
+
 type Hashable interface {
 	GetId() string
 }
@@ -54,6 +66,7 @@ func NewLocalRepos(db, col string, entryTmpl Hashable, opts ...ReposOption) *Loc
 	repos := &LocalRepos{
 		database:        db,
 		collection:      col,
+		client:          getClient(db, col),
 		refreshInterval: defaultRefreshInterval,
 	}
 	for _, opt := range opts {
@@ -80,7 +93,7 @@ func (r *LocalRepos) Init() {
 }
 
 func (r *LocalRepos) reloadEntries() error {
-	c, s := Open(r.database, r.collection)
+	c, s := r.client.Open(r.database, r.collection)
 	defer s.Close()
 
 	newData := map[string]Hashable{}
@@ -109,12 +122,32 @@ func (r *LocalRepos) reloadEntries() error {
 	return nil
 }
 
-func (r *LocalRepos) All() []Hashable {
+func (r *LocalRepos) AllValues() []Hashable {
 	r.RLock()
 	defer r.RUnlock()
 	var ret []Hashable
-	for _, item := range r.data {
-		ret = append(ret, item)
+	for _, v := range r.data {
+		ret = append(ret, v)
+	}
+	return ret
+}
+
+func (r *LocalRepos) AllKeys() []string {
+	r.RLock()
+	defer r.RUnlock()
+	var ret []string
+	for k := range r.data {
+		ret = append(ret, k)
+	}
+	return ret
+}
+
+func (r *LocalRepos) AllItems() []*ReposKVEntry {
+	r.RLock()
+	defer r.RUnlock()
+	var ret []*ReposKVEntry
+	for k, v := range r.data {
+		ret = append(ret, &ReposKVEntry{k, v})
 	}
 	return ret
 }
