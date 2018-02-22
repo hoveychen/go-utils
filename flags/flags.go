@@ -19,6 +19,9 @@ var (
 func ValidateNonZero(names ...string) {
 	for _, name := range names {
 		// NOTE: Bool flags not supported.
+		if stringPtrs[name] == nil && durationPtrs[name] == nil && float64Ptrs[name] == nil && intPtrs[name] == nil && slicePtrs[name] == nil {
+			log.Fatalf("%s is not defined", name)
+		}
 		if stringPtrs[name] != nil && *stringPtrs[name] == "" {
 			log.Fatalf("Missing --%s", name)
 		}
