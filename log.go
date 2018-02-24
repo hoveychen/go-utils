@@ -69,6 +69,26 @@ func LogFatal(v ...interface{}) {
 	os.Exit(1)
 }
 
+// Same as LogInfo, except accepting formating info.
+func LogInfof(msg string, v ...interface{}) {
+	LogInfo(fmt.Sprintf(msg, v...))
+}
+
+// Same as LogError, except accepting formating info.
+func LogErrorf(msg string, v ...interface{}) {
+	LogError(fmt.Sprintf(msg, v...))
+}
+
+// Same as LogDebug, except accepting formating info.
+func LogDebugf(msg string, v ...interface{}) {
+	LogDebug(fmt.Sprintf(msg, v...))
+}
+
+// Same as LogFatal, except accepting formating info.
+func LogFatalf(msg string, v ...interface{}) {
+	LogFatal(fmt.Sprintf(msg, v...))
+}
+
 // PrintJson outputs any varible in Json format to console. Useful for debuging.
 func PrintJson(v interface{}) {
 	fmt.Println(Jsonify(v))
