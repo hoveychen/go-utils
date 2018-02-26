@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 
 	"github.com/hoveychen/go-utils/flags"
 )
@@ -65,7 +66,11 @@ func LogDebug(v ...interface{}) {
 // LogFatal prints error to error output with [FATAL] prefix, and terminate the
 // application.
 func LogFatal(v ...interface{}) {
-	fatalLog.Output(2, fmt.Sprintln(v...))
+	var msgs []string
+	for _, i := range v {
+		msgs = append(msgs, fmt.Sprintf("%+v", i))
+	}
+	fatalLog.Output(2, strings.Join(msgs, " "))
 	os.Exit(1)
 }
 
