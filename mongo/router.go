@@ -2,8 +2,6 @@ package mongo
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -11,6 +9,7 @@ import (
 	"github.com/globalsign/mgo"
 	goutils "github.com/hoveychen/go-utils"
 	"github.com/hoveychen/go-utils/flags"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -54,11 +53,11 @@ type Hint struct {
 func LoadJsonFileRouter(filename string) (*Router, error) {
 	d, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Readfile: %s", filename)
 	}
 	r := &Router{}
 	if err := json.Unmarshal(d, r); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Unmarshall router json")
 	}
 	r.Init()
 
@@ -69,7 +68,7 @@ func LoadJsonFileRouter(filename string) (*Router, error) {
 // It will perform validation to the router configuration.
 func (r *Router) Init() error {
 	if err := r.validate(); err != nil {
-		return err
+		return errors.Wrap(err, "Validate")
 	}
 
 	serverMap := map[string]*Server{}
@@ -96,14 +95,14 @@ func (r *Router) validate() error {
 	serverMap := map[string]string{}
 	for _, s := range r.Servers {
 		if serverMap[s.Name] != "" {
-			return errors.New(fmt.Sprint("Server name duplication", s.Name, s.Address, serverMap[s.Name]))
+			return errors.Errorf("Server name duplication, %s, %s, %s", s.Name, s.Address, serverMap[s.Name])
 		}
 		serverMap[s.Name] = s.Address
 	}
 
 	for _, h := range r.Hints {
 		if serverMap[h.ServerName] == "" {
-			return errors.New(fmt.Sprint("No server name found for hint", h.Database, h.Collection, h.ServerName))
+			return errors.Errorf("No server name found for hint, db:%s, col:%s, server:%s", h.Database, h.Collection, h.ServerName)
 		}
 	}
 	return nil
@@ -121,7 +120,6 @@ func (r *Router) DetermineServer(db, c string) (ret *Server) {
 		return s
 	}
 
-	goutils.LogDebug(db, c, "has no hint for servers. Returning the first server in config.")
 	return r.Servers[0]
 }
 

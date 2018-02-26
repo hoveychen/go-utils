@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/globalsign/mgo/bson"
+	"github.com/pkg/errors"
 )
 
 // LocalRepos is a Key/Value map that cached the data from a particular mongodb
@@ -112,7 +113,7 @@ func (r *LocalRepos) reloadEntries() error {
 	}
 
 	if iter.Err() != nil {
-		return iter.Err()
+		return errors.Wrap(iter.Err(), "Iterate entries")
 	}
 
 	r.Lock()
