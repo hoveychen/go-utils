@@ -67,7 +67,6 @@ func NewLocalRepos(db, col string, entryTmpl Hashable, opts ...ReposOption) *Loc
 	repos := &LocalRepos{
 		database:        db,
 		collection:      col,
-		client:          getClient(db, col),
 		refreshInterval: defaultRefreshInterval,
 	}
 	for _, opt := range opts {
@@ -83,6 +82,9 @@ func NewLocalRepos(db, col string, entryTmpl Hashable, opts ...ReposOption) *Loc
 }
 
 func (r *LocalRepos) Init() {
+	if r.client == nil {
+		r.client = getClient(r.database, r.collection)
+	}
 	r.reloadEntries()
 
 	r.ticker = time.NewTicker(r.refreshInterval)
