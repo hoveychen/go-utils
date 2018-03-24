@@ -26,6 +26,9 @@ func DedupStrings(slice []string) []string {
 	m := map[string]bool{}
 	ret := []string{}
 	for _, s := range slice {
+		if s == "" {
+			continue
+		}
 		if m[s] {
 			continue
 		} else {
