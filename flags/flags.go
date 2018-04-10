@@ -52,7 +52,11 @@ func (s *sliceContainer) String() string {
 }
 
 func (s *sliceContainer) Set(value string) error {
-	*s.S = strings.Split(value, ",")
+	if value == "" {
+		*s.S = nil
+	} else {
+		*s.S = strings.Split(value, ",")
+	}
 	return nil
 }
 
