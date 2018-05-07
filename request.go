@@ -22,7 +22,7 @@ import (
 
 var (
 	proxyAddr      = flags.String("proxy", "", "Specify proxy address to fetch data")
-	proxyType      = flags.String("proxyType", "sock5", "Either sock5 or http for proxy.")
+	proxyType      = flags.String("proxyType", "", "Either 'sock5' or 'http' for proxy.")
 	requestTimeout = flags.Int("requestTimeout", 10, "Timeout in sec when fetching a remote page.")
 	logAccess      = flags.Bool("logAccess", false, "True to log every requests.")
 	downloadClient *http.Client
@@ -54,18 +54,27 @@ func GetDownloadClient() *http.Client {
 	requestOnce.Do(func() {
 		httpTransport := &http.Transport{}
 		if *proxyAddr != "" {
-			switch *proxyType {
-			case "http":
-				proxyUrl, err := url.Parse(*proxyAddr)
-				if err != nil {
-					LogFatal("Failed to parse --proxyAddr", err)
+			proxyURL, err := url.Parse(*proxyAddr)
+			if err != nil {
+				LogFatal("Failed to parse --proxyAddr", err)
+			}
+			if *proxyType == "" {
+				switch proxyURL.Scheme {
+				case "http", "https":
+					*proxyType = "http"
+				case "socks5":
+					*proxyType = "sock5"
 				}
-				httpTransport.Proxy = http.ProxyURL(proxyUrl)
+			}
+
+			switch *proxyType {
+			case "http", "https":
+				httpTransport.Proxy = http.ProxyURL(proxyURL)
 				httpTransport.TLSClientConfig = &tls.Config{
 					InsecureSkipVerify: true,
 				}
-			case "sock5":
-				dialer, err := proxy.SOCKS5("tcp", *proxyAddr, nil, proxy.Direct)
+			case "sock5", "socks5":
+				dialer, err := proxy.SOCKS5("tcp", proxyURL.Host, nil, proxy.Direct)
 				if err != nil {
 					LogFatal("Failed to dial sock5", err)
 				}
