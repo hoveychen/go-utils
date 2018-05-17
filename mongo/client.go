@@ -56,7 +56,12 @@ func Dial(addr string) *DbClient {
 }
 
 func (c *DbClient) Open(db, collection string) (*mgo.Collection, *DbSession) {
-	c.dbConcurrent <- struct{}{}
+	select {
+	case c.dbConcurrent <- struct{}{}:
+	default:
+		goutils.LogFatal("Mongodb opened too many connections.", db, collection)
+
+	}
 	c.dbWaitGroup.Add(1)
 
 	mgoSession := c.session.Copy()
