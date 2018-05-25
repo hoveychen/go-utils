@@ -11,6 +11,8 @@ var (
 	textTmplCache = gomap.New()
 )
 
+type Var map[string]interface{}
+
 func Sprintt(textTmpl string, data interface{}) string {
 	ret := textTmplCache.GetOrCreate(textTmpl, func() interface{} {
 		tpl, err := template.New("test").Parse(textTmpl)
