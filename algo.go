@@ -59,6 +59,15 @@ func ReverseStringSlice(slice []string) []string {
 	return ret
 }
 
+func StringSliceIndex(slice []string, s string) int {
+	for i, e := range slice {
+		if e == s {
+			return i
+		}
+	}
+	return -1
+}
+
 type StringIntPair struct {
 	Key   string
 	Value int
