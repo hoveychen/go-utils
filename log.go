@@ -51,6 +51,14 @@ func LogError(v ...interface{}) {
 	errLog.Output(2, fmt.Sprintln(v...))
 }
 
+func LogErrorDetail(v ...interface{}) {
+	var msgs []string
+	for _, i := range v {
+		msgs = append(msgs, fmt.Sprintf("%+v", i))
+	}
+	errLog.Output(2, strings.Join(msgs, " "))
+}
+
 // LogInfo prints info to standard output with [INFO] prefix.
 func LogInfo(v ...interface{}) {
 	infoLog.Output(2, fmt.Sprintln(v...))
