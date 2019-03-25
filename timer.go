@@ -6,12 +6,8 @@ import (
 )
 
 var (
-	ChinaTimezone *time.Location // In case the deploying machine is not in +8 Timezone.
+	ChinaTimezone = time.FixedZone("Asia/Shanghai", 8*60*60) // In case the deploying machine is not in +8 Timezone.
 )
-
-func init() {
-	ChinaTimezone, _ = time.LoadLocation("Asia/Shanghai")
-}
 
 func GetNow() time.Time {
 	return time.Now().In(ChinaTimezone)
