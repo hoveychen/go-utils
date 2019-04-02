@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/hoveychen/go-utils"
+	goutils "github.com/hoveychen/go-utils"
 )
 
 type CsvReader struct {
@@ -21,12 +21,14 @@ type CsvReader struct {
 	fieldIdx       []string
 	file           *os.File
 	sliceDelimiter string
+	tagDelimiter   string
 }
 
 func NewCsvReader(r io.Reader) *CsvReader {
 	return &CsvReader{
 		Reader:         csv.NewReader(r),
 		sliceDelimiter: defaultSliceDelimiter,
+		tagDelimiter:   defaultTagDelimiter,
 	}
 }
 
@@ -54,6 +56,10 @@ func (r *CsvReader) SetSliceDelimiter(delim string) {
 	r.sliceDelimiter = delim
 }
 
+func (r *CsvReader) SetTagDelimiter(delim string) {
+	r.tagDelimiter = delim
+}
+
 func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 	colDict := map[string]string{}
 	for i := 0; i < val.Type().NumField(); i++ {
@@ -62,23 +68,25 @@ func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 			// Unexported field will have PkgPath.
 			continue
 		}
-		tag := field.Tag.Get("csv")
-		var name string
-		if tag == "" {
-			name = field.Name
-		} else if tag == "-" {
-			continue
-		} else {
-			name = tag
-		}
-		name = strings.TrimSpace(strings.ToLower(name))
+		textTags := field.Tag.Get("csv")
+		var tags []string
 
-		_, exists := colDict[name]
-		if exists {
-			goutils.LogError("Duplicated field name", name)
+		if textTags == "" {
+			tags = []string{field.Name}
+		} else if textTags == "-" {
 			continue
 		} else {
-			colDict[name] = field.Name
+			tags = strings.Split(textTags, r.tagDelimiter)
+		}
+
+		for _, name := range tags {
+			name = strings.TrimSpace(strings.ToLower(name))
+			if colDict[name] != "" {
+				goutils.LogError("Duplicated field name", name)
+				continue
+			} else {
+				colDict[name] = field.Name
+			}
 		}
 	}
 
@@ -151,6 +159,20 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 					}
 				}
 			}
+		case reflect.Map:
+			if v.IsNil() {
+				// Create map first.
+				m := reflect.MakeMap(v.Type())
+				v.Set(m)
+			}
+			columnName := r.Headers[idx]
+			value := reflect.New(v.Type().Elem())
+			_, err := fmt.Sscanf(row[idx], "%v", value.Interface())
+			if err != nil && err != io.EOF {
+				allError = multierror.Append(allError, err)
+				continue
+			}
+			v.SetMapIndex(reflect.ValueOf(columnName), value.Elem())
 		default:
 			_, err := fmt.Sscanf(row[idx], "%v", v.Addr().Interface())
 			if err != nil && err != io.EOF {

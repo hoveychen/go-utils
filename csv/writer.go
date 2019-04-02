@@ -12,10 +12,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hoveychen/go-utils"
+	goutils "github.com/hoveychen/go-utils"
 )
 
 const defaultSliceDelimiter = "\n"
+const defaultTagDelimiter = ","
 
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
 // shortcut to write to a file.

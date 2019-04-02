@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	goutils "github.com/hoveychen/go-utils"
 )
 
 func ExampleCsvReader() {
@@ -92,6 +94,44 @@ func TestSliceStruct(t *testing.T) {
 		}
 		if !compStrSlice(exp.StringSlice, st.StringSlice) {
 			t.Errorf("StringSlice not same: expected %v actual %v", exp.StringSlice, st.StringSlice)
+		}
+	}
+	st := &TestStruct{}
+	if err := r.ReadStruct(st); err != io.EOF {
+		t.Error("Not correctly output EOF")
+	}
+}
+
+func TestMapStruct(t *testing.T) {
+	type TestStruct struct {
+		Item     string             `csv:"item"`
+		Currency map[string]string  `csv:"US,CN,FR"`
+		Price    map[string]float64 `csv:"US-price,CN-price,FR-price"`
+	}
+
+	input := `US,US-price,FR,FR-price,GB,GB-price,item
+USD,49.99,EUR,59.99,GBP,39.99,small set
+USD,89.99,EUR,99.99,GBP,79.99,large set`
+
+	expected := []*TestStruct{
+		{"small set", map[string]string{"US": "USD", "FR": "EUR"}, map[string]float64{"US-price": 49.99, "FR-price": 59.99}},
+		{"large set", map[string]string{"US": "USD", "FR": "EUR"}, map[string]float64{"US-price": 89.99, "FR-price": 99.99}},
+	}
+
+	r := NewCsvReader(bytes.NewBufferString(input))
+	defer r.Close()
+	r.SetTagDelimiter(",")
+
+	for i := 0; i < len(expected); i++ {
+		st := &TestStruct{}
+		if err := r.ReadStruct(st); err != nil {
+			t.Errorf("ReadStruct Line:%d, err=%v", i, err)
+			continue
+		}
+
+		exp := expected[i]
+		if goutils.Jsonify(st) != goutils.Jsonify(exp) {
+			t.Error("Expect:\n", goutils.Jsonify(exp), "\nActual:\n", goutils.Jsonify(st))
 		}
 	}
 	st := &TestStruct{}
