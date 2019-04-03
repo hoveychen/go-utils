@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"strings"
 
+	"gitlab.momoso.com/mms2/utils/lg"
+
 	multierror "github.com/hashicorp/go-multierror"
 	goutils "github.com/hoveychen/go-utils"
 )
@@ -80,7 +82,6 @@ func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 		}
 
 		for _, name := range tags {
-			name = strings.TrimSpace(strings.ToLower(name))
 			if colDict[name] != "" {
 				goutils.LogError("Duplicated field name", name)
 				continue
@@ -92,7 +93,7 @@ func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 
 	r.Headers = row
 	for _, h := range row {
-		col := strings.TrimSpace(strings.ToLower(h))
+		col := strings.TrimSpace(h)
 		name, exists := colDict[col]
 		if !exists {
 			r.fieldIdx = append(r.fieldIdx, "")
@@ -169,6 +170,7 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 			value := reflect.New(v.Type().Elem())
 			_, err := fmt.Sscanf(row[idx], "%v", value.Interface())
 			if err != nil && err != io.EOF {
+				lg.Error(col, columnName, row[idx], err)
 				allError = multierror.Append(allError, err)
 				continue
 			}
