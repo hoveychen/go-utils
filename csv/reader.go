@@ -44,6 +44,7 @@ func NewFileCsvReader(filename string) *CsvReader {
 		Reader:         csv.NewReader(file),
 		file:           file,
 		sliceDelimiter: defaultSliceDelimiter,
+		tagDelimiter:   defaultTagDelimiter,
 	}
 }
 
