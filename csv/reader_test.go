@@ -181,3 +181,44 @@ tb:16881031910,连衣裙,161542,tb:16881031910,tb:168810166,0.25,TRUE,女装,连
 		t.Error("Not correctly output EOF")
 	}
 }
+
+func TestMapStruct3(t *testing.T) {
+	type TagRow struct {
+		ID           string            `csv:"ID" bson:"_id"`
+		Translations map[string]string `csv:"en,cs" bson:"translations"`
+	}
+
+	input := `
+ID,en,cs,pl,pt,fi,ar,nl,es,da,zh-Hans,it,th,de,sv,fr,no
+1128,Polo Shirts,Polo tričko,Koszulki polo,Camisas polo,Poolopaidat,قمصان البولو,Poloshirt,Camisas de polo,Polo skjorter,Polo衫,Magliette polo,เสื้อโปโล,Polo-Shirts,Polotröjor,Polos,Polo skjorter
+`
+
+	expected := []*TagRow{
+		{
+			"1128", map[string]string{
+				"en": "Polo Shirts", "cs": "Polo tričko",
+			},
+		},
+	}
+
+	r := NewCsvReader(bytes.NewBufferString(input))
+	defer r.Close()
+	r.SetTagDelimiter(",")
+
+	for i := 0; i < len(expected); i++ {
+		st := &TagRow{}
+		if err := r.ReadStruct(st); err != nil {
+			t.Errorf("ReadStruct Line:%d, err=%v", i, err)
+			continue
+		}
+
+		exp := expected[i]
+		if goutils.Jsonify(st) != goutils.Jsonify(exp) {
+			t.Error("Expect:\n", goutils.Jsonify(exp), "\nActual:\n", goutils.Jsonify(st))
+		}
+	}
+	st := &TagRow{}
+	if err := r.ReadStruct(st); err != io.EOF {
+		t.Error("Not correctly output EOF")
+	}
+}

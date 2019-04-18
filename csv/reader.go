@@ -169,11 +169,16 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 			}
 			columnName := r.Headers[idx]
 			value := reflect.New(v.Type().Elem())
-			_, err := fmt.Sscanf(row[idx], "%v", value.Interface())
-			if err != nil && err != io.EOF {
-				lg.Error(col, columnName, row[idx], err)
-				allError = multierror.Append(allError, err)
-				continue
+			switch v.Type().Elem().Kind() {
+			case reflect.String:
+				value.Elem().SetString(row[idx])
+			default:
+				_, err := fmt.Sscanf(row[idx], "%v", value.Interface())
+				if err != nil && err != io.EOF {
+					lg.Error(col, columnName, row[idx], err)
+					allError = multierror.Append(allError, err)
+					continue
+				}
 			}
 			v.SetMapIndex(reflect.ValueOf(columnName), value.Elem())
 		default:
