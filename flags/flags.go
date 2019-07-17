@@ -1,117 +1,219 @@
+// Package flags provide a global flags cache and extends types of flags.
 package flags
 
 import (
 	"flag"
-	"log"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 )
 
 var (
-	stringPtrs   = map[string]*string{}
-	boolPtrs     = map[string]*bool{}
-	durationPtrs = map[string]*time.Duration{}
-	float64Ptrs  = map[string]*float64{}
-	intPtrs      = map[string]*int{}
-	slicePtrs    = map[string]*[]string{}
+	ptrs = map[string]interface{}{}
 )
 
-func ValidateNonZero(names ...string) {
+// ValidateNonZero checks the flags non-zero after parsing.
+func ValidateNonZero(names ...string) error {
 	for _, name := range names {
-		// NOTE: Bool flags not supported.
-		if stringPtrs[name] == nil && durationPtrs[name] == nil && float64Ptrs[name] == nil && intPtrs[name] == nil && slicePtrs[name] == nil {
-			log.Fatalf("%s is not defined", name)
+		ptr, exists := ptrs[name]
+		if !exists {
+			return fmt.Errorf("%s is not defined", name)
 		}
-		if stringPtrs[name] != nil && *stringPtrs[name] == "" {
-			log.Fatalf("Missing --%s", name)
-		}
-		if durationPtrs[name] != nil && int64(*durationPtrs[name]) == 0 {
-			log.Fatalf("Missing --%s", name)
-		}
-		if float64Ptrs[name] != nil && *float64Ptrs[name] == 0 {
-			log.Fatalf("Missing --%s", name)
-		}
-		if intPtrs[name] != nil && *intPtrs[name] == 0 {
-			log.Fatalf("Missing --%s", name)
-		}
-		if slicePtrs[name] != nil && len(*slicePtrs[name]) == 0 {
-			log.Fatalf("Missing --%s", name)
-		}
-	}
-}
 
-type sliceContainer struct {
-	S *[]string
-}
-
-func (s *sliceContainer) String() string {
-	if s == nil || s.S == nil {
-		return ""
-	}
-	return strings.Join(*s.S, ",")
-}
-
-func (s *sliceContainer) Set(value string) error {
-	if value == "" {
-		*s.S = nil
-	} else {
-		*s.S = strings.Split(value, ",")
+		check := false
+		switch ptr.(type) {
+		case *bool:
+			// It's trivial to check a bool, since it makes the flag no sense(always true).
+			check = *ptr.(*bool)
+		case *string:
+			check = *ptr.(*string) != ""
+		case *time.Duration:
+			check = *ptr.(*int64) > 0
+		case *float64:
+			check = *ptr.(*float64) != 0
+		case *int:
+			check = *ptr.(*int) != 0
+		case *[]string:
+			check = len(*ptr.(*[]string)) > 0
+		case *os.File:
+			check = *ptr.(**os.File) != nil
+		default:
+			// NOTE: Custom flags not supported.
+			check = true
+		}
+		if !check {
+			return fmt.Errorf("Missing --%s", name)
+		}
 	}
 	return nil
 }
 
-func String(name string, value string, usage string) *string {
-	if _, exists := stringPtrs[name]; !exists {
-		stringPtrs[name] = flag.String(name, value, usage)
-	}
-
-	return stringPtrs[name]
+type sliceValue struct {
+	S []string
 }
 
-func Int(name string, value int, usage string) *int {
-	if _, exists := intPtrs[name]; !exists {
-		intPtrs[name] = flag.Int(name, value, usage)
+func (s *sliceValue) String() string {
+	if s == nil || s.S == nil {
+		return ""
 	}
-
-	return intPtrs[name]
+	return strings.Join(s.S, ",")
 }
 
-func Bool(name string, value bool, usage string) *bool {
-	if _, exists := boolPtrs[name]; !exists {
-		boolPtrs[name] = flag.Bool(name, value, usage)
+func (s *sliceValue) Set(value string) error {
+	if value == "" {
+		s.S = nil
+	} else {
+		s.S = strings.Split(value, ",")
 	}
-
-	return boolPtrs[name]
+	return nil
 }
 
-func Float64(name string, value float64, usage string) *float64 {
-	if _, exists := float64Ptrs[name]; !exists {
-		float64Ptrs[name] = flag.Float64(name, value, usage)
-	}
-
-	return float64Ptrs[name]
+type readfileValue struct {
+	file *os.File
 }
 
-func Slice(name string, value []string, usage string) *[]string {
-	if _, exists := slicePtrs[name]; !exists {
-		var s []string
-		if value == nil {
-			s = []string{}
-		} else {
-			s = value
+func (rf *readfileValue) String() string {
+	if rf.file == nil {
+		return ""
+	}
+	info, err := rf.file.Stat()
+	if err != nil {
+		return ""
+	}
+	return info.Name()
+}
+
+func (rf *readfileValue) Set(value string) error {
+	var err error
+	if value == "" {
+		rf.file = nil
+	} else {
+		rf.file, err = os.Open(value)
+	}
+	return err
+}
+
+// String binds flag with string type.
+func String(name string, defaultValue string, usage string) *string {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*string)
+	}
+	ptr := flag.String(name, defaultValue, usage)
+	ptrs[name] = ptr
+	return ptr
+}
+
+// Int binds flag with int type.
+func Int(name string, defaultValue int, usage string) *int {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*int)
+	}
+	ptr := flag.Int(name, defaultValue, usage)
+	ptrs[name] = ptr
+	return ptr
+}
+
+// Bool binds flag with bool type.
+func Bool(name string, defaultValue bool, usage string) *bool {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*bool)
+	}
+	ptr := flag.Bool(name, defaultValue, usage)
+	ptrs[name] = ptr
+	return ptr
+}
+
+// Float64 binds flag with float64 type.
+func Float64(name string, defaultValue float64, usage string) *float64 {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*float64)
+	}
+	ptr := flag.Float64(name, defaultValue, usage)
+	ptrs[name] = ptr
+	return ptr
+}
+
+// Slice binds flag with slice type.
+func Slice(name string, defaultValue []string, usage string) *[]string {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*[]string)
+	}
+
+	container := sliceValue{S: defaultValue}
+	flag.Var(&container, name, usage)
+	ptr := &container.S
+	ptrs[name] = ptr
+	return ptr
+}
+
+// Duration binds flag with time.Duration type.
+func Duration(name string, defaultValue time.Duration, usage string) *time.Duration {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(*time.Duration)
+	}
+	ptr := flag.Duration(name, defaultValue, usage)
+	ptrs[name] = ptr
+	return ptr
+}
+
+// ReadFile binds flag with *os.File type. It will check the existent of file.
+func ReadFile(name, path, usage string) **os.File {
+	if ptr, exists := ptrs[name]; exists {
+		return ptr.(**os.File)
+	}
+	container := readfileValue{}
+	if path != "" {
+		var err error
+		container.file, err = os.Open(path)
+		if err != nil {
+			return nil
 		}
-		slicePtrs[name] = &s
-
-		container := sliceContainer{S: &s}
-		flag.Var(&container, name, usage)
 	}
-	return slicePtrs[name]
+	flag.Var(&container, name, usage)
+	ptr := &container.file
+	ptrs[name] = ptr
+	return ptr
 }
 
-func Duration(name string, value time.Duration, usage string) *time.Duration {
-	if _, exists := float64Ptrs[name]; !exists {
-		durationPtrs[name] = flag.Duration(name, value, usage)
-	}
+type muxValue struct {
+	values []flag.Value
+}
 
-	return durationPtrs[name]
+func (cc *muxValue) String() string {
+	if len(cc.values) > 0 {
+		return cc.values[0].String()
+	}
+	return ""
+}
+
+func (cc *muxValue) Set(value string) error {
+	for i, c := range cc.values {
+		if err := c.Set(value); err != nil {
+			return fmt.Errorf("Parse custom value: %d", i)
+		}
+	}
+	return nil
+}
+
+func (cc *muxValue) Append(value flag.Value) {
+	cc.values = append(cc.values, value)
+}
+
+// Var binds flag with custom value.
+func Var(value flag.Value, name string, usage string) {
+	if ptr, exists := ptrs[name]; exists {
+		if cc, ok := ptr.(*muxValue); ok {
+			cc.Append(value)
+		}
+		return
+	}
+	container := &muxValue{}
+	container.Append(value)
+
+	flag.Var(container, name, usage)
+
+	ptr := container
+	ptrs[name] = ptr
+	return
 }
