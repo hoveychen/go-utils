@@ -47,7 +47,7 @@ func (l *httpLogger) LogResponse(req *http.Request, res *http.Response, err erro
 		LogError("[Response]", err, req.URL.String())
 		return
 	}
-	LogInfo("[Response]", req.Method, res.StatusCode, duration.Seconds(), req.URL.String())
+	LogInfo("[Response]", req.Method, res.StatusCode, duration, req.URL.String())
 }
 
 func GetDownloadClient() *http.Client {
