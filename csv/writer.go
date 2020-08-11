@@ -18,6 +18,8 @@ import (
 const defaultSliceDelimiter = "\n"
 const defaultTagDelimiter = ","
 
+var bomUtf8 = []byte{0xEF, 0xBB, 0xBF}
+
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
 // shortcut to write to a file.
 type CsvWriter struct {
@@ -30,6 +32,7 @@ type CsvWriter struct {
 }
 
 func NewCsvWriter(w io.Writer) *CsvWriter {
+	w.Write(bomUtf8)
 	return &CsvWriter{
 		Writer:         csv.NewWriter(w),
 		sliceDelimiter: defaultSliceDelimiter,
@@ -42,6 +45,7 @@ func NewFileCsvWriter(filename string) *CsvWriter {
 		goutils.LogError(err)
 		return nil
 	}
+	file.Write(bomUtf8)
 	return &CsvWriter{
 		Writer:         csv.NewWriter(file),
 		file:           file,
