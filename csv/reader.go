@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"gitlab.momoso.com/mms2/utils/lg"
 
@@ -95,6 +96,9 @@ func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 	r.Headers = row
 	for _, h := range row {
 		col := strings.TrimSpace(h)
+		col = strings.TrimFunc(col, func(r rune) bool {
+			return !unicode.IsGraphic(r)
+		})
 		name, exists := colDict[col]
 		if !exists {
 			r.fieldIdx = append(r.fieldIdx, "")
@@ -138,6 +142,7 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 		if row[idx] == "" {
 			continue
 		}
+		fmt.Println(row[idx])
 		v := val.FieldByName(col)
 		switch v.Kind() {
 		case reflect.String:
