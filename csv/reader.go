@@ -142,7 +142,6 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 		if row[idx] == "" {
 			continue
 		}
-		fmt.Println(row[idx])
 		v := val.FieldByName(col)
 		switch v.Kind() {
 		case reflect.String:
