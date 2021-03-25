@@ -29,6 +29,7 @@ type CsvWriter struct {
 	file           *os.File
 	fieldIdx       []string
 	sliceDelimiter string
+	skipJsonNull   bool
 }
 
 func NewCsvWriter(w io.Writer) *CsvWriter {
@@ -36,6 +37,7 @@ func NewCsvWriter(w io.Writer) *CsvWriter {
 	return &CsvWriter{
 		Writer:         csv.NewWriter(w),
 		sliceDelimiter: defaultSliceDelimiter,
+		skipJsonNull:   true,
 	}
 }
 
@@ -50,6 +52,7 @@ func NewFileCsvWriter(filename string) *CsvWriter {
 		Writer:         csv.NewWriter(file),
 		file:           file,
 		sliceDelimiter: defaultSliceDelimiter,
+		skipJsonNull:   true,
 	}
 }
 
@@ -59,6 +62,9 @@ func (w *CsvWriter) buildFieldIndex(val reflect.Value) {
 		field := val.Type().Field(i)
 		if field.PkgPath != "" {
 			// Unexported field will have PkgPath.
+			continue
+		}
+		if w.skipJsonNull && field.Tag.Get("json") == "-" {
 			continue
 		}
 		tag := field.Tag.Get("csv")
@@ -78,6 +84,10 @@ func (w *CsvWriter) buildFieldIndex(val reflect.Value) {
 
 func (w *CsvWriter) SetSliceDelimiter(delim string) {
 	w.sliceDelimiter = delim
+}
+
+func (w *CsvWriter) SetSkipJsonNull(skip bool) {
+	w.skipJsonNull = skip
 }
 
 func (w *CsvWriter) WriteStruct(i interface{}) error {
