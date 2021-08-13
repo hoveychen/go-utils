@@ -108,6 +108,31 @@ func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
 	}
 }
 
+func (r *CsvReader) ReadAllStructs(i interface{}) error {
+	val := reflect.ValueOf(i)
+	if val.Kind() != reflect.Ptr {
+		return errors.New("Input slice need to be a ptr")
+	}
+	if val.Elem().Kind() != reflect.Slice {
+		return errors.New("Input need to be a slice")
+	}
+	typ := val.Elem().Type().Elem()
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+
+	for {
+		inner := reflect.New(typ)
+		if err := r.ReadStruct(inner.Interface()); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		val.Elem().Set(reflect.Append(val.Elem(), inner))
+	}
+}
+
 func (r *CsvReader) ReadStruct(i interface{}) error {
 	val := reflect.ValueOf(i)
 	if val.Kind() == reflect.Ptr {
