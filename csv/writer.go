@@ -16,83 +16,123 @@ import (
 )
 
 const defaultSliceDelimiter = "\n"
-const defaultTagDelimiter = ","
 
 var bomUtf8 = []byte{0xEF, 0xBB, 0xBF}
 
 // CsvWriter extends the encoding/csv writer, supporting writting struct, and
 // shortcut to write to a file.
 type CsvWriter struct {
-	sync.Mutex
 	*csv.Writer
-	Headers        []string
-	file           *os.File
-	fieldIdx       []string
+	w              io.Writer
+	columns        []*ColumnInfo
 	sliceDelimiter string
 	skipJsonNull   bool
+	headerWritten  bool
+	appendBom      bool
+	lock           sync.Mutex
 }
 
-func NewCsvWriter(w io.Writer) *CsvWriter {
-	w.Write(bomUtf8)
-	return &CsvWriter{
+func NewCsvWriter(w io.Writer, opts ...WriterOption) *CsvWriter {
+	cw := &CsvWriter{
 		Writer:         csv.NewWriter(w),
+		w:              w,
 		sliceDelimiter: defaultSliceDelimiter,
 		skipJsonNull:   true,
+		appendBom:      true,
+	}
+	for _, opt := range opts {
+		opt(cw)
+	}
+	return cw
+}
+
+type WriterOption func(*CsvWriter)
+
+func WithColumnInfos(infos []*ColumnInfo) WriterOption {
+	return func(cw *CsvWriter) {
+		cw.columns = infos
 	}
 }
 
-func NewFileCsvWriter(filename string) *CsvWriter {
-	file, err := os.Create(filename)
-	if err != nil {
-		goutils.LogError(err)
-		return nil
-	}
-	file.Write(bomUtf8)
-	return &CsvWriter{
-		Writer:         csv.NewWriter(file),
-		file:           file,
-		sliceDelimiter: defaultSliceDelimiter,
-		skipJsonNull:   true,
+func WithSliceDelimiter(d string) WriterOption {
+	return func(cw *CsvWriter) {
+		cw.sliceDelimiter = d
 	}
 }
 
-func (w *CsvWriter) buildFieldIndex(val reflect.Value) {
-	w.fieldIdx = []string{}
-	for i := 0; i < val.Type().NumField(); i++ {
-		field := val.Type().Field(i)
-		if field.PkgPath != "" {
-			// Unexported field will have PkgPath.
+func WithSkipJSONNull(skip bool) WriterOption {
+	return func(cw *CsvWriter) {
+		cw.skipJsonNull = skip
+	}
+}
+
+func WithAppendBOM(enabled bool) WriterOption {
+	return func(cw *CsvWriter) {
+		cw.appendBom = enabled
+	}
+}
+
+func (w *CsvWriter) writeHeader() error {
+	if w.appendBom {
+		if _, err := w.w.Write(bomUtf8); err != nil {
+			return err
+		}
+	}
+	var fields []string
+	for _, col := range w.columns {
+		if w.skipJsonNull && col.IsJsonNull {
 			continue
 		}
-		if w.skipJsonNull && field.Tag.Get("json") == "-" {
-			continue
+		for i := 0; i < col.NumSpan; i++ {
+			fields = append(fields, col.HeaderName)
 		}
-		tag := field.Tag.Get("csv")
-		var name string
-		if tag == "" {
-			name = field.Name
-		} else if tag == "-" {
-			continue
-		} else {
-			name = tag
-		}
-
-		w.Headers = append(w.Headers, name)
-		w.fieldIdx = append(w.fieldIdx, field.Name)
 	}
+	return w.Write(fields)
 }
 
-func (w *CsvWriter) SetSliceDelimiter(delim string) {
-	w.sliceDelimiter = delim
+func limitContent(str string, limit int) string {
+	if limit <= 0 || len(str) <= limit {
+		return str
+	}
+	return str[:limit]
 }
 
-func (w *CsvWriter) SetSkipJsonNull(skip bool) {
-	w.skipJsonNull = skip
+func (w *CsvWriter) genSlice(col *ColumnInfo, v *reflect.Value) []string {
+	var values []string
+	if v.Kind() != reflect.Slice {
+		values = append(values, fmt.Sprint(v.Interface()))
+	} else {
+		for i := 0; i < v.Len(); i++ {
+			values = append(values, fmt.Sprint(v.Index(i).Interface()))
+		}
+	}
+
+	if col.NumSpan == 1 {
+		// Merge values into one cell with delimiter.
+		str := strings.Join(values, w.sliceDelimiter)
+		return []string{limitContent(str, col.Limit)}
+	}
+
+	if len(values) >= col.NumSpan {
+		values = values[:col.NumSpan]
+	}
+	if len(values) < col.NumSpan {
+		for i := len(values); i < col.NumSpan; i++ {
+			values = append(values, "")
+		}
+	}
+
+	for i := 0; i < len(values); i++ {
+		values[i] = limitContent(values[i], col.Limit)
+	}
+
+	return values
 }
 
 func (w *CsvWriter) WriteStruct(i interface{}) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
 	val := reflect.ValueOf(i)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -101,23 +141,26 @@ func (w *CsvWriter) WriteStruct(i interface{}) error {
 		return errors.New("Input need to be a struct")
 	}
 
-	if w.Headers == nil {
-		w.buildFieldIndex(val)
-		w.Write(w.Headers)
+	if len(w.columns) == 0 {
+		w.columns = GenerateColumnInfos(val.Type())
 	}
 
-	out := []string{}
-	for _, name := range w.fieldIdx {
-		v := val.FieldByName(name)
-		switch v.Kind() {
-		case reflect.Slice:
-			var segs []string
-			for i := 0; i < v.Len(); i++ {
-				segs = append(segs, fmt.Sprint(v.Index(i).Interface()))
-			}
-			out = append(out, strings.Join(segs, w.sliceDelimiter))
-		default:
-			out = append(out, fmt.Sprint(v.Interface()))
+	if !w.headerWritten {
+		w.writeHeader()
+		w.headerWritten = true
+	}
+
+	var out []string
+	for _, col := range w.columns {
+		if w.skipJsonNull && col.IsJsonNull {
+			continue
+		}
+		v := val.FieldByName(col.LookupField)
+		if col.IsSlice {
+			out = append(out, w.genSlice(col, &v)...)
+		} else {
+			str := fmt.Sprint(v.Interface())
+			out = append(out, limitContent(str, col.Limit))
 		}
 	}
 	w.Write(out)
@@ -125,11 +168,32 @@ func (w *CsvWriter) WriteStruct(i interface{}) error {
 }
 
 func (w *CsvWriter) Close() error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock.Lock()
+	defer w.lock.Unlock()
 	w.Flush()
-	if w.file != nil {
-		return w.file.Close()
+	return w.Error()
+}
+
+type FileCsvWriter struct {
+	*CsvWriter
+	File *os.File
+}
+
+// NewFileCsvWriter is combination of creating file and passing it to a writer.
+func NewFileCsvWriter(filename string) *FileCsvWriter {
+	file, err := os.Create(filename)
+	if err != nil {
+		goutils.LogError(err)
+		return nil
 	}
-	return nil
+	file.Write(bomUtf8)
+	return &FileCsvWriter{
+		CsvWriter: NewCsvWriter(file),
+		File:      file,
+	}
+}
+
+func (fcw *FileCsvWriter) Close() error {
+	fcw.Flush()
+	return fcw.File.Close()
 }

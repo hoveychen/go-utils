@@ -4,108 +4,90 @@ package csv
 
 import (
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"unicode"
-
-	"gitlab.momoso.com/mms2/utils/lg"
 
 	multierror "github.com/hashicorp/go-multierror"
 	goutils "github.com/hoveychen/go-utils"
+	"github.com/pkg/errors"
 )
 
 type CsvReader struct {
 	*csv.Reader
-	Headers        []string
-	fieldIdx       []string
-	file           *os.File
+	columns        []*ColumnInfo
+	skipJsonNull   bool
+	headers        []string
 	sliceDelimiter string
-	tagDelimiter   string
+	lock           sync.Mutex
 }
 
-func NewCsvReader(r io.Reader) *CsvReader {
-	return &CsvReader{
+func NewCsvReader(r io.Reader, opts ...ReaderOption) *CsvReader {
+	cr := &CsvReader{
 		Reader:         csv.NewReader(r),
 		sliceDelimiter: defaultSliceDelimiter,
-		tagDelimiter:   defaultTagDelimiter,
+	}
+	for _, opt := range opts {
+		opt(cr)
+	}
+	return cr
+}
+
+type ReaderOption func(*CsvReader)
+
+func WithReaderSliceDelimiter(d string) ReaderOption {
+	return func(cr *CsvReader) {
+		cr.sliceDelimiter = d
 	}
 }
 
-func NewFileCsvReader(filename string) *CsvReader {
-	file, err := os.Open(filename)
+func WithReaderColumnInfos(infos []*ColumnInfo) ReaderOption {
+	return func(cr *CsvReader) {
+		cr.columns = infos
+	}
+}
+
+func WithReaderSkipJSONNull(skip bool) ReaderOption {
+	return func(cr *CsvReader) {
+		cr.skipJsonNull = skip
+	}
+}
+
+func (r *CsvReader) readValue() (map[string][]string, error) {
+	if len(r.headers) == 0 {
+		row, err := r.Read()
+		if err != nil {
+			return nil, err
+		}
+
+		// Filter unexpected characters.
+		for i := 0; i < len(row); i++ {
+			col := strings.TrimSpace(row[i])
+			col = strings.TrimFunc(col, func(r rune) bool {
+				return !unicode.IsGraphic(r)
+			})
+			row[i] = col
+		}
+		r.headers = row
+	}
+
+	row, err := r.Read()
 	if err != nil {
-		goutils.LogError(err)
-		return nil
-	}
-	return &CsvReader{
-		Reader:         csv.NewReader(file),
-		file:           file,
-		sliceDelimiter: defaultSliceDelimiter,
-		tagDelimiter:   defaultTagDelimiter,
-	}
-}
-
-func (r *CsvReader) Close() error {
-	if r.file != nil {
-		return r.file.Close()
-	}
-	return nil
-}
-
-func (r *CsvReader) SetSliceDelimiter(delim string) {
-	r.sliceDelimiter = delim
-}
-
-func (r *CsvReader) SetTagDelimiter(delim string) {
-	r.tagDelimiter = delim
-}
-
-func (r *CsvReader) buildFieldIndex(val reflect.Value, row []string) {
-	colDict := map[string]string{}
-	for i := 0; i < val.Type().NumField(); i++ {
-		field := val.Type().Field(i)
-		if field.PkgPath != "" {
-			// Unexported field will have PkgPath.
-			continue
-		}
-		textTags := field.Tag.Get("csv")
-		var tags []string
-
-		if textTags == "" {
-			tags = []string{field.Name}
-		} else if textTags == "-" {
-			continue
-		} else {
-			tags = strings.Split(textTags, r.tagDelimiter)
-		}
-
-		for _, name := range tags {
-			if colDict[name] != "" {
-				goutils.LogError("Duplicated field name", name)
-				continue
-			} else {
-				colDict[name] = field.Name
-			}
-		}
+		return nil, err
 	}
 
-	r.Headers = row
-	for _, h := range row {
-		col := strings.TrimSpace(h)
-		col = strings.TrimFunc(col, func(r rune) bool {
-			return !unicode.IsGraphic(r)
-		})
-		name, exists := colDict[col]
-		if !exists {
-			r.fieldIdx = append(r.fieldIdx, "")
-		} else {
-			r.fieldIdx = append(r.fieldIdx, name)
-		}
+	if len(row) != len(r.headers) {
+		return nil, errors.New("Length of values not equals to length of header")
 	}
+	ret := make(map[string][]string)
+	for i := 0; i < len(r.headers); i++ {
+		ret[r.headers[i]] = append(ret[r.headers[i]], row[i])
+	}
+	return ret, nil
 }
 
 func (r *CsvReader) ReadAllStructs(i interface{}) error {
@@ -134,6 +116,9 @@ func (r *CsvReader) ReadAllStructs(i interface{}) error {
 }
 
 func (r *CsvReader) ReadStruct(i interface{}) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	val := reflect.ValueOf(i)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -142,41 +127,50 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 		return errors.New("Input need to be a struct")
 	}
 
-	row, err := r.Read()
+	if len(r.columns) == 0 {
+		r.columns = GenerateColumnInfos(val.Type())
+	}
+
+	values, err := r.readValue()
 	if err != nil {
 		return err
 	}
 
-	if r.Headers == nil {
-		r.buildFieldIndex(val, row)
-		row, err = r.Read()
-		if err != nil {
-			return err
-		}
-	}
-
 	var allError error
-	for idx, col := range r.fieldIdx {
-		if idx >= len(row) {
-			// Should never be here.
+	for _, col := range r.columns {
+		if r.skipJsonNull && col.IsJsonNull {
 			continue
 		}
-		if col == "" {
+		value := values[col.HeaderName]
+		if len(value) == 0 {
+			// Is it possible?
 			continue
 		}
-		if row[idx] == "" {
-			continue
-		}
-		v := val.FieldByName(col)
+		v := val.FieldByName(col.LookupField)
 		switch v.Kind() {
+		case reflect.Invalid:
+			// Nothing happen?
 		case reflect.String:
 			// Try to parse the string to correspond type.
 			// NOTE: Using fmt.Sscanf("%v") will only parse the first
 			// space-delimited token. If the cell contains like "123 abc",
 			// only "123" will be parsed, while "abc" ignored.
-			v.SetString(row[idx])
+			v.SetString(value[0])
 		case reflect.Slice:
-			segs := strings.Split(row[idx], r.sliceDelimiter)
+			if !col.IsSlice {
+				allError = multierror.Append(allError, errors.Errorf("Field %s is not of kind slice?", col.LookupField))
+				continue
+			}
+			var segs []string
+			if col.NumSpan <= 1 {
+				// Split by delimiter
+				if value[0] != "" {
+					segs = strings.Split(value[0], r.sliceDelimiter)
+				}
+			} else {
+				segs = value
+			}
+
 			slice := reflect.MakeSlice(v.Type(), len(segs), len(segs))
 			v.Set(slice)
 			for idx, s := range segs {
@@ -190,32 +184,33 @@ func (r *CsvReader) ReadStruct(i interface{}) error {
 					}
 				}
 			}
-		case reflect.Map:
-			if v.IsNil() {
-				// Create map first.
-				m := reflect.MakeMap(v.Type())
-				v.Set(m)
-			}
-			columnName := r.Headers[idx]
-			value := reflect.New(v.Type().Elem())
-			switch v.Type().Elem().Kind() {
-			case reflect.String:
-				value.Elem().SetString(row[idx])
-			default:
-				_, err := fmt.Sscanf(row[idx], "%v", value.Interface())
-				if err != nil && err != io.EOF {
-					lg.Error(col, columnName, row[idx], err)
-					allError = multierror.Append(allError, err)
-					continue
-				}
-			}
-			v.SetMapIndex(reflect.ValueOf(columnName), value.Elem())
 		default:
-			_, err := fmt.Sscanf(row[idx], "%v", v.Addr().Interface())
+			_, err := fmt.Sscanf(value[0], "%v", v.Addr().Interface())
 			if err != nil && err != io.EOF {
 				allError = multierror.Append(allError, err)
 			}
 		}
 	}
 	return allError
+}
+
+type FileCsvReader struct {
+	*CsvReader
+	File *os.File
+}
+
+func NewFileCsvReader(filename string) *FileCsvReader {
+	file, err := os.Open(filename)
+	if err != nil {
+		goutils.LogError(err)
+		return nil
+	}
+	return &FileCsvReader{
+		CsvReader: NewCsvReader(file),
+		File:      file,
+	}
+}
+
+func (r *FileCsvReader) Close() error {
+	return r.File.Close()
 }
